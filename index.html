@@ -5,13 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>AbAI — Antibody Assistant</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PDFMAKE (client-side PDFs, free) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
   <style>
     .card { @apply rounded-2xl border border-gray-200 bg-white p-4 shadow; }
     .btn  { @apply inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm shadow hover:shadow-md transition; }
     .btn-primary { @apply bg-black text-white border-black; }
     .badge { @apply inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700; }
     .input { @apply w-full rounded-xl border border-gray-300 px-3 py-2; }
-    .select { @apply rounded-xl border border-gray-300 px-3 py-2 bg-white; }
     .tab-active { @apply bg-black text-white; }
     .dark .card { @apply bg-zinc-900 border-zinc-800; }
     .dark .btn { @apply border-zinc-700; }
@@ -42,7 +44,7 @@
       <!-- Messages -->
       <div class="card">
         <div id="msgs" class="h-[64vh] overflow-auto space-y-4 pr-1">
-          <!-- assistant greeting -->
+          <!-- assistant greeting will render here -->
         </div>
 
         <!-- Composer -->
@@ -127,7 +129,114 @@
   </main>
 
   <script>
-    // ---------- State ----------
+    // ================== CONFIG (optional) ==================
+    // If you set an ABAI_TOKEN in Cloudflare Pages (Settings → Environment Variables),
+    // put the same value here to send it with every request.
+    // Leave as null if you didn't set a token.
+    const CLIENT_ABAI_TOKEN = null; // e.g., "my-shared-secret"
+
+    // Helper to add common headers (and optional token)
+    function withHeaders(base = {}, isMultipart = false) {
+      const h = new Headers(base);
+      if (!isMultipart && !h.has('content-type')) h.set('content-type', 'application/json');
+      if (CLIENT_ABAI_TOKEN) h.set('x-abai-token', CLIENT_ABAI_TOKEN);
+      return h;
+    }
+
+    // ================== PDF HELPERS (client-side) ==================
+    function money(n) { return n == null ? '—' : `$${Number(n).toFixed(2)}`; }
+
+    function docForExperiment(exp) {
+      const { title, summary, inputsTable, bomTable, blastResults, protocolHtml } = exp;
+
+      function tableFrom(rows) {
+        if (!rows || !rows.length) return { text: '—', margin: [0,4,0,0] };
+        const header = rows[0].map(h => ({ text: String(h), style: 'th' }));
+        const body = [header, ...rows.slice(1).map(r => r.map(c => ({ text: String(c ?? '') })))];
+        return {
+          table: { headerRows: 1, widths: Array(header.length).fill('*'), body },
+          layout: 'lightHorizontalLines',
+          margin: [0, 6, 0, 12]
+        };
+      }
+
+      function stripHtml(html) {
+        const div = document.createElement('div'); div.innerHTML = html || '';
+        return div.textContent || div.innerText || '';
+      }
+
+      return {
+        pageSize: 'A4',
+        pageMargins: [36, 48, 36, 54],
+        footer: (current, total) => ({
+          columns: [
+            { text: 'AbAI — Antibody Assistant', style: 'footerLeft' },
+            { text: `Page ${current} of ${total}`, alignment: 'right', style: 'footerRight' }
+          ],
+          margin: [36, 6, 36, 12]
+        }),
+        content: [
+          { text: title || 'Staining Experiment', style: 'h1' },
+          { text: summary || '', style: 'summary' },
+          { text: 'Inputs', style: 'h2', margin: [0, 16, 0, 4] },
+          tableFrom(inputsTable),
+          ...(blastResults ? [
+            { text: 'BLAST Results', style: 'h2', margin: [0, 8, 0, 4] },
+            { text: JSON.stringify(blastResults, null, 2), style: 'code' }
+          ] : []),
+          { text: 'Bill of Materials', style: 'h2', margin: [0, 8, 0, 4] },
+          tableFrom(bomTable),
+          { text: 'Protocol', style: 'h2', margin: [0, 8, 0, 4], pageBreak: 'before' },
+          { text: stripHtml(protocolHtml), style: 'body' }
+        ],
+        styles: {
+          h1: { fontSize: 20, bold: true, margin: [0, 0, 0, 8] },
+          h2: { fontSize: 14, bold: true },
+          summary: { margin: [0, 4, 0, 8] },
+          th: { bold: true, fillColor: '#efefef' },
+          code: { fontSize: 9, color: '#333', margin: [0, 2, 0, 8] },
+          body: { fontSize: 11 },
+          footerLeft: { fontSize: 9, color: '#666' },
+          footerRight: { fontSize: 9, color: '#666' }
+        },
+        defaultStyle: { fontSize: 11 }
+      };
+    }
+
+    function docForInventory(inv) {
+      const rows = [
+        ['Name','Description','Link','Qty','Date Added','Expiration'],
+        ...inv.map(i => [
+          i.name || '', i.description || '', i.link || '', String(i.qty || 0),
+          (i.dateAdded || '').slice(0,10), (i.expiration || '').slice(0,10)
+        ])
+      ];
+      return {
+        pageSize: 'A4',
+        pageMargins: [36, 48, 36, 54],
+        content: [
+          { text: 'Inventory', style: 'h1' },
+          {
+            table: {
+              headerRows: 1,
+              widths: ['*','*','*','auto','auto','auto'],
+              body: [
+                rows[0].map(h => ({ text: h, style: 'th' })),
+                ...rows.slice(1).map(r => r.map(c => ({ text: String(c ?? '') })))
+              ]
+            },
+            layout: 'lightHorizontalLines'
+          }
+        ],
+        styles: {
+          h1: { fontSize: 20, bold: true, margin: [0, 0, 0, 12] },
+          th: { bold: true, fillColor: '#efefef' }
+        },
+        defaultStyle: { fontSize: 11 }
+      };
+    }
+
+    // ================== State / Elements ==================
     const el = (id) => document.getElementById(id);
     const msgsEl = el('msgs');
     const inputEl = el('input');
@@ -137,7 +246,6 @@
     const summaryEl = el('summary');
     const panelEl = el('panel');
     const expListEl = el('expList');
-
     const invBodyEl = el('invBody');
     const invCountEl = el('invCount');
     const chkAllEl = el('chkAll');
@@ -149,7 +257,7 @@
     let inventory = [];  // fetched from API
     let experiments = []; // fetched from API
 
-    // ---------- Tabs ----------
+    // ================== Tabs ==================
     const tabs = document.querySelectorAll('[data-tab]');
     const sections = { chat: el('chat'), experiments: el('experiments'), inventory: el('inventory') };
     tabs.forEach(b=>{
@@ -163,14 +271,16 @@
       };
     });
 
-    // ---------- Dark mode ----------
+    // ================== Dark mode ==================
     el('mode').onclick = () => {
       dark = !dark;
       document.documentElement.classList.toggle('dark', dark);
       el('mode').textContent = dark ? "☀️ Light mode" : "🌙 Dark mode";
     };
 
-    // ---------- Chat UI ----------
+    // ================== Render Helpers ==================
+    function escapeHtml(s){ return (s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     function renderMsgs() {
       msgsEl.innerHTML = '';
       messages.forEach(m => {
@@ -181,7 +291,6 @@
       });
       msgsEl.scrollTop = msgsEl.scrollHeight;
     }
-    function escapeHtml(s){ return (s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
     function renderSummary() {
       const d = design || {};
@@ -196,7 +305,7 @@
       ].join('');
       protoReadyEl.textContent = 'protocol: ' + (d.protocolReady ? 'ready' : 'not ready');
 
-      // panel
+      // Panel
       panelEl.innerHTML = '';
       (d.selectedAntibodies||[]).forEach(a => {
         const div = document.createElement('div');
@@ -207,6 +316,7 @@
       if (!d.selectedAntibodies || d.selectedAntibodies.length===0){
         panelEl.innerHTML = '<div class="text-xs opacity-70">No antibodies selected yet.</div>';
       }
+
       function row(k,v){ return '<div class="flex items-start justify-between gap-4"><div class="opacity-70">'+k+'</div><div class="text-right font-medium max-w-[60%]">'+escapeHtml(String(v))+'</div></div>'; }
     }
 
@@ -214,10 +324,10 @@
       attachedEl.innerHTML = uploads.map(u => '<span class="badge">'+escapeHtml(u.name)+'</span>').join(' ');
     }
 
-    // greeting
+    // ================== Greeting ==================
     renderMsgs(); renderSummary();
 
-    // send
+    // ================== Chat send ==================
     el('send').onclick = send;
     inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ send(); }});
     filesEl.onchange = () => {
@@ -228,31 +338,33 @@
     async function send() {
       const text = inputEl.value.trim();
       if (!text && uploads.length===0) return;
+
       // Add user message
       messages.push({ role:'user', content: text });
       renderMsgs();
       inputEl.value = '';
 
-      // Call LLM orchestrator
-      const res = await fetch('/api/llm/plan-step', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ messages, design, inventory })
-      });
-      const json = await res.json();
-      // merge design patch if any
-      if (json.facts_patch) design = { ...design, ...json.facts_patch };
-      // show assistant message
-      messages.push({ role:'assistant', content: json.assistant_message || '(no response)' });
+      try {
+        const res = await fetch('/api/llm/plan-step', {
+          method: 'POST',
+          headers: withHeaders(),
+          body: JSON.stringify({ messages, design, inventory })
+        });
+        const json = await res.json();
+        if (json.facts_patch) design = { ...design, ...json.facts_patch };
+        messages.push({ role:'assistant', content: json.assistant_message || '(no response)' });
+      } catch (e) {
+        messages.push({ role:'assistant', content: 'Sorry, I hit a network error calling /api/llm/plan-step.' });
+      }
       renderMsgs(); renderSummary();
     }
 
-    // buttons
+    // ================== Buttons ==================
     el('extractEq').onclick = async () => {
       if (uploads.length===0) { alert('Attach at least one image first.'); return; }
       const fd = new FormData();
       uploads.forEach(u => u.file && fd.append('file', u.file, u.name));
-      const r = await fetch('/api/equipment/ocr', { method: 'POST', body: fd });
+      const r = await fetch('/api/equipment/ocr', { method: 'POST', headers: withHeaders({}, true), body: fd });
       const eq = await r.json();
       if (eq.equipment?.length){
         const set = new Set([...(design.availableEquipment||[]), ...eq.equipment]);
@@ -265,7 +377,7 @@
 
     el('searchNow').onclick = async () => {
       const r = await fetch('/api/search', {
-        method:'POST', headers:{'content-type':'application/json'},
+        method:'POST', headers: withHeaders(),
         body: JSON.stringify({ goal: design.goal, species: design.species, target: design.target, constraints: design.constraints })
       });
       const data = await r.json();
@@ -277,7 +389,7 @@
 
     el('runBlast').onclick = async () => {
       const r = await fetch('/api/epitope/blast', {
-        method:'POST', headers:{'content-type':'application/json'},
+        method:'POST', headers: withHeaders(),
         body: JSON.stringify({ target: design.target, species: design.species })
       });
       const b = await r.json();
@@ -286,14 +398,16 @@
       renderMsgs(); renderSummary();
     };
 
+    // ---- UPDATED: Client-side PDF for Experiment ----
     el('genPdf').onclick = async () => {
-      // Build shopping list first
+      // 1) Build shopping list
       const bomRes = await fetch('/api/shop/build-list', {
-        method:'POST', headers:{'content-type':'application/json'},
+        method:'POST', headers: withHeaders(),
         body: JSON.stringify({ design, inventory })
       });
       const bom = await bomRes.json();
 
+      // 2) Build tables for export
       const inputsTable = [
         ['Goal', design.goal||'—'],
         ['Species', design.species||'—'],
@@ -304,41 +418,37 @@
       ];
       const bomTable = [
         ['Image','Name','Description','Link','Unit Cost','Qty','Total'],
-        ...((bom.items||[]).map(it => [it.image, it.name, it.description, it.link, `$${it.unitCost}`, it.units, `$${it.total}`])),
-        ['','','','','','Grand Total', `$${bom.grandTotal||0}`]
+        ...((bom.items||[]).map(it => [
+          '', // omit image in PDF (CORS); can be added later as data URL
+          it.name, it.description, it.link, money(it.unitCost), it.units, money(it.total)
+        ])),
+        ['','','','','','Grand Total', money(bom.grandTotal||0)]
       ];
-      const payload = {
-        experiment: {
-          title: (design.goal || 'Staining Experiment').slice(0,80),
-          summary: `Species: ${design.species||'—'} | Target: ${design.target||'—'} | Budget: ${design?.constraints?.budgetUSD ?? '—'} | Time: ${design?.constraints?.timeLimitHours ?? '—'}h`,
-          inputsTable,
-          blastResults: design.blastResult || null,
-          bomTable,
-          protocolHtml: "<h3>Fixation</h3><p>4% PFA 10–15 min...</p><h3>Permeabilization</h3><p>0.1% Triton X-100 10 min...</p><h3>Blocking</h3><p>1–5% BSA 30–60 min...</p><h3>Primary</h3><p>Overnight 4°C or 1–2 h RT...</p><h3>Secondary</h3><p>1 h RT, protected from light...</p><h3>Imaging</h3><p>Match channels to conjugates; avoid bleed-through...</p>"
-        }
-      };
-      const ex = await fetch('/api/export/pdf', {
-        method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload)
-      });
-      const { pdfUrl } = await ex.json();
 
-      // Save experiment
-      await fetch('/api/experiments', {
-        method:'POST', headers:{'content-type':'application/json'},
-        body: JSON.stringify({
-          title: payload.experiment.title,
-          summary: payload.experiment.summary,
-          pdfUrl,
-          designSnapshot: design
-        })
+      const experiment = {
+        title: (design.goal || 'Staining Experiment').slice(0,80),
+        summary: `Species: ${design.species||'—'} | Target: ${design.target||'—'} | Budget: ${design?.constraints?.budgetUSD ?? '—'} | Time: ${design?.constraints?.timeLimitHours ?? '—'}h`,
+        inputsTable,
+        blastResults: design.blastResult || null,
+        bomTable,
+        protocolHtml: "<h3>Fixation</h3><p>4% PFA 10–15 min...</p><h3>Permeabilization</h3><p>0.1% Triton X-100 10 min...</p><h3>Blocking</h3><p>1–5% BSA 30–60 min...</p><h3>Primary</h3><p>Overnight 4°C or 1–2 h RT...</p><h3>Secondary</h3><p>1 h RT, protected from light...</p><h3>Imaging</h3><p>Match channels to conjugates; avoid bleed-through...</p>"
+      };
+
+      // 3) Build PDF (client-side) and save the data URL
+      const doc = docForExperiment(experiment);
+      pdfMake.createPdf(doc).getDataUrl(async (dataUrl) => {
+        await fetch('/api/experiments', {
+          method:'POST', headers: withHeaders(),
+          body: JSON.stringify({ title: experiment.title, summary: experiment.summary, pdfUrl: dataUrl, designSnapshot: design })
+        });
+        messages.push({ role:'assistant', content: 'Your experiment was saved with a real PDF. See “My Experiments” to download or remix.' });
+        renderMsgs();
       });
-      messages.push({ role:'assistant', content: 'Your experiment was saved. See “My Experiments” to download or remix.' });
-      renderMsgs();
     };
 
-    // ---------- Experiments ----------
+    // ================== Experiments ==================
     async function loadExperiments(){
-      const r = await fetch('/api/experiments');
+      const r = await fetch('/api/experiments', { headers: withHeaders() });
       experiments = await r.json();
       expListEl.innerHTML = '';
       experiments.forEach(exp => {
@@ -371,12 +481,13 @@
       if (experiments.length===0) expListEl.innerHTML = '<div class="text-sm opacity-70">No experiments yet.</div>';
     }
 
-    // ---------- Inventory ----------
+    // ================== Inventory ==================
     async function loadInventory(){
-      const r = await fetch('/api/inventory');
+      const r = await fetch('/api/inventory', { headers: withHeaders() });
       inventory = await r.json();
       renderInventory();
     }
+
     function renderInventory(){
       invBodyEl.innerHTML = '';
       invCountEl.textContent = inventory.length + ' items';
@@ -402,35 +513,40 @@
         invBodyEl.appendChild(tr);
       });
     }
+
     // Add item
     el('addItem').onclick = async () => {
-      const r = await fetch('/api/inventory', { method:'POST', headers:{'content-type':'application/json'},
+      const r = await fetch('/api/inventory', { method:'POST', headers: withHeaders(),
         body: JSON.stringify({ name:'New item', qty:1, dateAdded: new Date().toISOString() })
       });
       const rec = await r.json();
       inventory.unshift(rec); renderInventory();
     };
-    // Update fields (debounced)
+
+    // Update fields
     invBodyEl.addEventListener('change', async (e)=>{
       const t = e.target;
       const id = t.getAttribute('data-id'); const f = t.getAttribute('data-f'); if (!id||!f) return;
       const val = (f==='qty') ? Number(t.value) : t.value;
-      await fetch('/api/inventory', { method:'PATCH', headers:{'content-type':'application/json'},
+      await fetch('/api/inventory', { method:'PATCH', headers: withHeaders(),
         body: JSON.stringify({ id, [f]: val })
       });
     });
+
     // Select all
     chkAllEl.onchange = () => {
       invBodyEl.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb => cb.checked = chkAllEl.checked);
     };
+
     // Delete selected
     el('delSelected').onclick = async () => {
       const ids = Array.from(invBodyEl.querySelectorAll('input[type="checkbox"][data-id]:checked')).map(cb => cb.getAttribute('data-id'));
       if (ids.length===0) return;
-      await fetch('/api/inventory', { method:'PATCH', headers:{'content-type':'application/json'}, body: JSON.stringify({ delete:true, ids }) });
+      await fetch('/api/inventory', { method:'PATCH', headers: withHeaders(), body: JSON.stringify({ delete:true, ids }) });
       inventory = inventory.filter(i => !ids.includes(i.id)); renderInventory();
     };
-    // CSV
+
+    // CSV download
     el('dlCsv').onclick = () => {
       const headers = ["Name","Description","Link","Qty","Date Added","Expiration"];
       const rows = inventory.map(i => [i.name||'', i.description||'', i.link||'', String(i.qty||0), i.dateAdded||'', i.expiration||'']);
@@ -438,31 +554,19 @@
       const url = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
       const a = document.createElement('a'); a.href=url; a.download='inventory.csv'; a.click(); URL.revokeObjectURL(url);
     };
-    // Inventory PDF via export API
+
+    // ---- UPDATED: Client-side PDF for Inventory ----
     el('dlInvPdf').onclick = async () => {
-      const table = [
-        ['Image','Name','Description','Link','Qty','Date Added','Expiration'],
-        ...inventory.map(i => [i.image||'', i.name||'', i.description||'', i.link||'', i.qty||0, (i.dateAdded||'').slice(0,10), (i.expiration||'').slice(0,10)])
-      ];
-      const payload = {
-        experiment: {
-          title: 'Inventory — ' + new Date().toISOString().slice(0,10),
-          summary: `Count: ${inventory.length}`,
-          inputsTable: [],
-          bomTable: table,
-          protocolHtml: ''
-        }
-      };
-      const ex = await fetch('/api/export/pdf', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) });
-      const { pdfUrl } = await ex.json();
-      location.href = pdfUrl; // download/view
+      const doc = docForInventory(inventory);
+      // open in new tab (or use .download('inventory.pdf') to force download)
+      pdfMake.createPdf(doc).open();
     };
 
-    // Initial loads
+    // ================== Init ==================
     (async function init(){
       renderMsgs();
-      await loadInventory();
-      await loadExperiments();
+      try { await loadInventory(); } catch { /* ignore */ }
+      try { await loadExperiments(); } catch { /* ignore */ }
     })();
   </script>
 </body>
