@@ -1,224 +1,469 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>AbAI — Antibody Shopping & Planner</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      .badge{ @apply inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700; }
-      .btn{ @apply inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium border border-gray-300 shadow-sm hover:shadow transition; }
-      .btn-primary{ @apply bg-black text-white border-black; }
-      .card{ @apply rounded-2xl shadow p-4 border border-gray-200 bg-white; }
-      .input{ @apply w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/30; }
-      .select{ @apply rounded-xl border border-gray-300 px-3 py-2 bg-white; }
-    </style>
-  </head>
-  <body class="bg-white text-gray-900">
-    <main class="max-w-6xl mx-auto px-4 py-10 space-y-8">
-      <header class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 class="text-3xl font-bold">AbAI — Antibody Shopping & Planner</h1>
-          <p class="text-gray-600">Cloudflare Pages + Functions. No local run required.</p>
-        </div>
-        <a href="https://dash.cloudflare.com/?to=/:account/pages" target="_blank" class="btn">Deploy on Cloudflare Pages</a>
-      </header>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AbAI — Antibody Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .card { @apply rounded-2xl border border-gray-200 bg-white p-4 shadow; }
+    .btn  { @apply inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm shadow hover:shadow-md transition; }
+    .btn-primary { @apply bg-black text-white border-black; }
+    .badge { @apply inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700; }
+    .input { @apply w-full rounded-xl border border-gray-300 px-3 py-2; }
+    .select { @apply rounded-xl border border-gray-300 px-3 py-2 bg-white; }
+    .tab-active { @apply bg-black text-white; }
+    .dark .card { @apply bg-zinc-900 border-zinc-800; }
+    .dark .btn { @apply border-zinc-700; }
+    .dark body { @apply bg-zinc-950 text-zinc-50; }
+  </style>
+</head>
+<body class="bg-neutral-50 text-neutral-900">
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Top bar -->
+    <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🤖</span>
+        <h1 class="text-2xl font-bold">AbAI — Antibody Assistant</h1>
+        <span class="text-xs opacity-70 border px-2 py-1 rounded-full">MVP</span>
+      </div>
+      <button id="mode" class="btn">🌙 Dark mode</button>
+    </div>
 
-      <section class="grid md:grid-cols-4 gap-6">
-        <div class="md:col-span-1 card space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">Query</label>
-            <input id="q" placeholder="Target / name / clone" class="input" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Applications</label>
-            <div id="apps" class="flex flex-wrap gap-2"></div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Species Reactivity</label>
-            <div id="species" class="flex flex-wrap gap-2"></div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1">Sort</label>
-            <select id="sort" class="select">
-              <option value="score">Best Match</option>
-              <option value="price">Lowest Price</option>
-            </select>
-          </div>
+    <!-- Tabs -->
+    <div class="mt-6 inline-flex overflow-hidden rounded-2xl border bg-white dark:bg-zinc-900 dark:border-zinc-800">
+      <button data-tab="chat" class="px-4 py-2 text-sm tab-active">Design Assistant</button>
+      <button data-tab="experiments" class="px-4 py-2 text-sm">My Experiments</button>
+      <button data-tab="inventory" class="px-4 py-2 text-sm">Inventory</button>
+    </div>
+
+    <!-- CHAT -->
+    <section id="chat" class="grid md:grid-cols-[1fr_360px] gap-6 mt-6">
+      <!-- Messages -->
+      <div class="card">
+        <div id="msgs" class="h-[64vh] overflow-auto space-y-4 pr-1">
+          <!-- assistant greeting -->
         </div>
 
-        <div class="md:col-span-3 space-y-4">
+        <!-- Composer -->
+        <div class="border-t mt-3 pt-3">
+          <div class="flex items-center gap-2">
+            <label class="btn cursor-pointer">
+              📎 Attach images
+              <input id="files" type="file" accept="image/*" multiple class="hidden">
+            </label>
+            <input id="input" class="input flex-1" placeholder="Type your message… (Enter to send)">
+            <button id="send" class="btn btn-primary">Send</button>
+          </div>
+          <div id="attached" class="flex gap-2 mt-2 flex-wrap text-xs"></div>
+          <div class="flex gap-2 mt-2">
+            <button id="extractEq" class="btn">🔍 Extract equipment from images</button>
+            <button id="searchNow" class="btn">🌐 Search now</button>
+            <button id="runBlast" class="btn">🧬 Run BLAST</button>
+            <button id="genPdf" class="btn btn-primary">📄 Generate PDF & Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right panel: summary -->
+      <div class="space-y-4">
+        <div class="card">
           <div class="flex items-center justify-between">
-            <h2 class="font-semibold">Results <span id="count" class="text-gray-500">(0)</span></h2>
-            <button class="btn" id="clear">Clear</button>
+            <h3 class="font-semibold">Design Summary</h3>
+            <span id="protoReady" class="text-xs opacity-70">protocol: not ready</span>
           </div>
-          <div id="results" class="grid gap-4"></div>
+          <div id="summary" class="mt-3 text-sm space-y-1"></div>
+          <div class="mt-3">
+            <h4 class="font-semibold mb-1">Antibody Panel</h4>
+            <div id="panel" class="text-sm space-y-2"></div>
+          </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="card">
-        <div class="flex items-start justify-between gap-4">
+    <!-- EXPERIMENTS -->
+    <section id="experiments" class="hidden mt-6">
+      <div class="card">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">My Experiments</h3>
+        </div>
+        <div id="expList" class="mt-3 grid gap-3"></div>
+      </div>
+    </section>
+
+    <!-- INVENTORY -->
+    <section id="inventory" class="hidden mt-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h3 class="font-semibold">Inventory</h3>
+          <span id="invCount" class="text-xs opacity-70">0 items</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="addItem" class="btn">➕ Add item</button>
+          <button id="delSelected" class="btn">🗑️ Delete selected</button>
+          <button id="dlCsv" class="btn btn-primary">⬇️ Download CSV</button>
+          <button id="dlInvPdf" class="btn btn-primary">📄 Inventory PDF</button>
+        </div>
+      </div>
+
+      <div class="overflow-auto card p-0">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="border-b">
+              <th class="p-3"><input id="chkAll" type="checkbox"></th>
+              <th class="p-3">Item</th>
+              <th class="p-3">Description</th>
+              <th class="p-3">Link</th>
+              <th class="p-3">Qty</th>
+              <th class="p-3">Date Added</th>
+              <th class="p-3">Expiration</th>
+            </tr>
+          </thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+      <div class="text-xs opacity-70">* Expiration will be checked during planning; expired items are excluded unless overridden.</div>
+    </section>
+  </main>
+
+  <script>
+    // ---------- State ----------
+    const el = (id) => document.getElementById(id);
+    const msgsEl = el('msgs');
+    const inputEl = el('input');
+    const filesEl = el('files');
+    const attachedEl = el('attached');
+    const protoReadyEl = el('protoReady');
+    const summaryEl = el('summary');
+    const panelEl = el('panel');
+    const expListEl = el('expList');
+
+    const invBodyEl = el('invBody');
+    const invCountEl = el('invCount');
+    const chkAllEl = el('chkAll');
+
+    let dark = false;
+    let uploads = []; // {name, file}
+    let messages = [{ role:'assistant', content: "Hi! I’m AbAI. Tell me your staining goal (e.g., ‘Assess skeletal muscle differentiation in primary satellite cells’). I’ll gather details, search protocols/antibodies, and generate a protocol + shopping PDF." }];
+    let design = {};     // filled step-by-step
+    let inventory = [];  // fetched from API
+    let experiments = []; // fetched from API
+
+    // ---------- Tabs ----------
+    const tabs = document.querySelectorAll('[data-tab]');
+    const sections = { chat: el('chat'), experiments: el('experiments'), inventory: el('inventory') };
+    tabs.forEach(b=>{
+      b.onclick = () => {
+        tabs.forEach(x=>x.classList.remove('tab-active'));
+        b.classList.add('tab-active');
+        Object.values(sections).forEach(s=>s.classList.add('hidden'));
+        sections[b.dataset.tab].classList.remove('hidden');
+        if (b.dataset.tab==='experiments') loadExperiments();
+        if (b.dataset.tab==='inventory') loadInventory();
+      };
+    });
+
+    // ---------- Dark mode ----------
+    el('mode').onclick = () => {
+      dark = !dark;
+      document.documentElement.classList.toggle('dark', dark);
+      el('mode').textContent = dark ? "☀️ Light mode" : "🌙 Dark mode";
+    };
+
+    // ---------- Chat UI ----------
+    function renderMsgs() {
+      msgsEl.innerHTML = '';
+      messages.forEach(m => {
+        const bubble = document.createElement('div');
+        bubble.className = 'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow ' + (m.role==='assistant' ? 'bg-neutral-100 dark:bg-zinc-800' : 'bg-black text-white dark:bg-zinc-100 dark:text-zinc-900 ml-auto');
+        bubble.innerHTML = '<div class="opacity-70 text-xs mb-1">' + (m.role==='assistant' ? 'AbAI' : 'You') + '</div>' + escapeHtml(m.content);
+        msgsEl.appendChild(bubble);
+      });
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+    function escapeHtml(s){ return (s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    function renderSummary() {
+      const d = design || {};
+      summaryEl.innerHTML = [
+        row('Goal', d.goal||'—'),
+        row('Species', d.species||'—'),
+        row('Target', d.target||'—'),
+        row('Equipment', (d.availableEquipment||[]).join(', ')||'—'),
+        row('Budget', d?.constraints?.budgetUSD != null ? ('$'+d.constraints.budgetUSD) : '—'),
+        row('Time limit', d?.constraints?.timeLimitHours != null ? (d.constraints.timeLimitHours+' h') : '—'),
+        row('BLAST required', d.blastRequired ? 'Yes' : 'No')
+      ].join('');
+      protoReadyEl.textContent = 'protocol: ' + (d.protocolReady ? 'ready' : 'not ready');
+
+      // panel
+      panelEl.innerHTML = '';
+      (d.selectedAntibodies||[]).forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'border rounded-xl p-2 flex items-center justify-between';
+        div.innerHTML = '<div><div class="font-medium">'+escapeHtml(a.name)+'</div><div class="text-xs opacity-70">'+(a.isPrimary?'Primary':'Secondary')+' • '+(a.vendor||'—')+(a.conjugate?(' • '+a.conjugate):'')+'</div></div><div class="text-xs opacity-70">'+(a.reactivity||[]).join('/')+'</div>';
+        panelEl.appendChild(div);
+      });
+      if (!d.selectedAntibodies || d.selectedAntibodies.length===0){
+        panelEl.innerHTML = '<div class="text-xs opacity-70">No antibodies selected yet.</div>';
+      }
+      function row(k,v){ return '<div class="flex items-start justify-between gap-4"><div class="opacity-70">'+k+'</div><div class="text-right font-medium max-w-[60%]">'+escapeHtml(String(v))+'</div></div>'; }
+    }
+
+    function renderUploads() {
+      attachedEl.innerHTML = uploads.map(u => '<span class="badge">'+escapeHtml(u.name)+'</span>').join(' ');
+    }
+
+    // greeting
+    renderMsgs(); renderSummary();
+
+    // send
+    el('send').onclick = send;
+    inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ send(); }});
+    filesEl.onchange = () => {
+      uploads = uploads.concat(Array.from(filesEl.files || []).map(f => ({ name: f.name, file: f })));
+      renderUploads();
+    };
+
+    async function send() {
+      const text = inputEl.value.trim();
+      if (!text && uploads.length===0) return;
+      // Add user message
+      messages.push({ role:'user', content: text });
+      renderMsgs();
+      inputEl.value = '';
+
+      // Call LLM orchestrator
+      const res = await fetch('/api/llm/plan-step', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messages, design, inventory })
+      });
+      const json = await res.json();
+      // merge design patch if any
+      if (json.facts_patch) design = { ...design, ...json.facts_patch };
+      // show assistant message
+      messages.push({ role:'assistant', content: json.assistant_message || '(no response)' });
+      renderMsgs(); renderSummary();
+    }
+
+    // buttons
+    el('extractEq').onclick = async () => {
+      if (uploads.length===0) { alert('Attach at least one image first.'); return; }
+      const fd = new FormData();
+      uploads.forEach(u => u.file && fd.append('file', u.file, u.name));
+      const r = await fetch('/api/equipment/ocr', { method: 'POST', body: fd });
+      const eq = await r.json();
+      if (eq.equipment?.length){
+        const set = new Set([...(design.availableEquipment||[]), ...eq.equipment]);
+        design.availableEquipment = Array.from(set);
+        renderSummary();
+        messages.push({ role:'assistant', content: 'I detected equipment: ' + design.availableEquipment.join(', ') });
+        renderMsgs();
+      }
+    };
+
+    el('searchNow').onclick = async () => {
+      const r = await fetch('/api/search', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ goal: design.goal, species: design.species, target: design.target, constraints: design.constraints })
+      });
+      const data = await r.json();
+      design.selectedAntibodies = data.antibodies || [];
+      design.protocolReady = true;
+      messages.push({ role:'assistant', content: 'I found protocols and candidate antibodies. Protocol is ready to assemble.' });
+      renderMsgs(); renderSummary();
+    };
+
+    el('runBlast').onclick = async () => {
+      const r = await fetch('/api/epitope/blast', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ target: design.target, species: design.species })
+      });
+      const b = await r.json();
+      design.blastResult = b;
+      messages.push({ role:'assistant', content: `BLAST result: best hit ${b.bestHitTarget}, identity ${b.identityPct}%` });
+      renderMsgs(); renderSummary();
+    };
+
+    el('genPdf').onclick = async () => {
+      // Build shopping list first
+      const bomRes = await fetch('/api/shop/build-list', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ design, inventory })
+      });
+      const bom = await bomRes.json();
+
+      const inputsTable = [
+        ['Goal', design.goal||'—'],
+        ['Species', design.species||'—'],
+        ['Target', design.target||'—'],
+        ['Equipment', (design.availableEquipment||[]).join(', ')||'—'],
+        ['Budget (USD)', design?.constraints?.budgetUSD ?? '—'],
+        ['Time limit (h)', design?.constraints?.timeLimitHours ?? '—']
+      ];
+      const bomTable = [
+        ['Image','Name','Description','Link','Unit Cost','Qty','Total'],
+        ...((bom.items||[]).map(it => [it.image, it.name, it.description, it.link, `$${it.unitCost}`, it.units, `$${it.total}`])),
+        ['','','','','','Grand Total', `$${bom.grandTotal||0}`]
+      ];
+      const payload = {
+        experiment: {
+          title: (design.goal || 'Staining Experiment').slice(0,80),
+          summary: `Species: ${design.species||'—'} | Target: ${design.target||'—'} | Budget: ${design?.constraints?.budgetUSD ?? '—'} | Time: ${design?.constraints?.timeLimitHours ?? '—'}h`,
+          inputsTable,
+          blastResults: design.blastResult || null,
+          bomTable,
+          protocolHtml: "<h3>Fixation</h3><p>4% PFA 10–15 min...</p><h3>Permeabilization</h3><p>0.1% Triton X-100 10 min...</p><h3>Blocking</h3><p>1–5% BSA 30–60 min...</p><h3>Primary</h3><p>Overnight 4°C or 1–2 h RT...</p><h3>Secondary</h3><p>1 h RT, protected from light...</p><h3>Imaging</h3><p>Match channels to conjugates; avoid bleed-through...</p>"
+        }
+      };
+      const ex = await fetch('/api/export/pdf', {
+        method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload)
+      });
+      const { pdfUrl } = await ex.json();
+
+      // Save experiment
+      await fetch('/api/experiments', {
+        method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({
+          title: payload.experiment.title,
+          summary: payload.experiment.summary,
+          pdfUrl,
+          designSnapshot: design
+        })
+      });
+      messages.push({ role:'assistant', content: 'Your experiment was saved. See “My Experiments” to download or remix.' });
+      renderMsgs();
+    };
+
+    // ---------- Experiments ----------
+    async function loadExperiments(){
+      const r = await fetch('/api/experiments');
+      experiments = await r.json();
+      expListEl.innerHTML = '';
+      experiments.forEach(exp => {
+        const div = document.createElement('div');
+        div.className = 'border rounded-2xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3';
+        div.innerHTML = `
           <div>
-            <h2 class="font-semibold">Shortlist</h2>
-            <p class="text-gray-600 text-sm">Antibodies you're considering.</p>
+            <div class="font-medium">${escapeHtml(exp.title||'Experiment')}</div>
+            <div class="text-xs opacity-70">${new Date(exp.date||Date.now()).toLocaleString()}</div>
+            <div class="text-sm mt-1">${escapeHtml(exp.summary||'')}</div>
           </div>
-          <button class="btn" id="clear-cart" style="display:none">Clear shortlist</button>
-        </div>
-        <div id="cart" class="mt-3 grid gap-3 text-sm text-gray-600">Nothing yet.</div>
-        <div id="plan" class="mt-4 border-t pt-4 text-sm" style="display:none"></div>
-      </section>
-
-      <footer class="text-center text-xs text-gray-500 py-6">
-        © <span id="year"></span> AbAI MVP. For demo use only.
-      </footer>
-    </main>
-
-    <script>
-      const appList = ['WB','ICC','IHC','Flow','IP'];
-      const speciesList = ['Human','Mouse','Rat'];
-      const selected = { apps: new Set(), species: new Set() };
-      const cart = [];
-
-      function badge(container, label, set) {
-        const btn = document.createElement('button');
-        btn.className = 'badge';
-        btn.textContent = label;
-        btn.onclick = () => {
-          if (set.has(label)) set.delete(label); else set.add(label);
-          btn.classList.toggle('bg-black');
-          btn.classList.toggle('text-white');
-          fetchResults();
-        };
-        container.appendChild(btn);
-      }
-
-      document.getElementById('apps').innerHTML = '';
-      document.getElementById('species').innerHTML = '';
-      appList.forEach(a => badge(document.getElementById('apps'), a, selected.apps));
-      speciesList.forEach(s => badge(document.getElementById('species'), s, selected.species));
-
-      document.getElementById('q').addEventListener('input', debounce(fetchResults, 250));
-      document.getElementById('sort').addEventListener('change', fetchResults);
-      document.getElementById('clear').addEventListener('click', () => {
-        document.getElementById('q').value='';
-        selected.apps.clear(); selected.species.clear();
-        document.querySelectorAll('.badge').forEach(el=>el.classList.remove('bg-black','text-white'));
-        fetchResults();
-      });
-      document.getElementById('clear-cart').addEventListener('click', () => {
-        cart.length = 0; renderCart();
-      });
-      document.getElementById('year').textContent = new Date().getFullYear();
-
-      function debounce(fn, ms) {
-        let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
-      }
-
-      async function fetchResults() {
-        const q = document.getElementById('q').value.trim();
-        const apps = Array.from(selected.apps).join(',');
-        const species = Array.from(selected.species).join(',');
-        const sort = document.getElementById('sort').value;
-
-        const params = new URLSearchParams();
-        if (q) params.set('q', q);
-        if (apps) params.set('apps', apps);
-        if (species) params.set('species', species);
-        params.set('sort', sort);
-        const res = await fetch('/api/antibodies?' + params.toString(), { cache: 'no-store' });
-        const json = await res.json();
-        renderResults(json.items || []);
-      }
-
-      function renderResults(items) {
-        document.getElementById('count').textContent = `(${items.length})`;
-        const root = document.getElementById('results');
-        root.innerHTML = '';
-        if (!items.length) {
-          root.innerHTML = '<div class="card text-center text-gray-600">No results. Try broadening your filters.</div>';
-          return;
-        }
-        items.forEach(a => {
-          const div = document.createElement('div');
-          div.className = 'card';
-          div.innerHTML = `
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <h3 class="text-lg font-semibold">${a.name}</h3>
-                <p class="text-sm text-gray-600">${a.vendor} • ${a.catalogNumber} • ${a.host} ${a.isotype ? '• '+a.isotype : ''}</p>
-                <p class="mt-1 text-sm"><span class="badge mr-2">${a.target}</span> ${a.reactivity.join(' / ')}</p>
-                <p class="text-sm text-gray-600 mt-1">Apps: ${a.applicationValidated.join(', ')}</p>
-                ${a.validation?.citationCount ? `<p class="text-xs text-gray-500 mt-1">Citations: ${a.validation.citationCount}${a.validation?.knockoutValidated ? ' • KO-validated' : ''}</p>` : ''}
-                ${a.notes ? `<p class="text-xs text-gray-500 mt-1">Notes: ${a.notes}</p>` : ''}
-                <div class="mt-2 text-sm">
-                  <a class="underline" href="${a.datasheetUrl}" target="_blank">Datasheet</a>
-                  ${a.rrid ? `<span class="ml-2 text-gray-500">RRID: ${a.rrid}</span>` : ''}
-                </div>
-              </div>
-              <div class="text-right min-w-[160px]">
-                <div class="text-xl font-bold">$${a.priceUSD}</div>
-                <div class="text-sm text-gray-500">${a.size}</div>
-                <button class="btn btn-primary mt-2" data-id="${a.id}">Add</button>
-              </div>
-            </div>
-          `;
-          div.querySelector('button').onclick = () => {
-            if (!cart.find(x=>x.id===a.id)) cart.push(a);
-            renderCart();
-          };
-          root.appendChild(div);
-        });
-      }
-
-      function renderCart() {
-        const root = document.getElementById('cart');
-        const clearBtn = document.getElementById('clear-cart');
-        root.innerHTML = '';
-        if (!cart.length) {
-          root.textContent = 'Nothing yet.';
-          clearBtn.style.display = 'none';
-          document.getElementById('plan').style.display = 'none';
-          return;
-        }
-        clearBtn.style.display = 'inline-flex';
-        cart.forEach(c => {
-          const row = document.createElement('div');
-          row.className = 'flex items-center justify-between border rounded-xl p-3';
-          row.innerHTML = `
-            <div>
-              <div class="font-medium">${c.name}</div>
-              <div class="text-sm text-gray-600">${c.vendor} • ${c.catalogNumber}</div>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="font-semibold">$${c.priceUSD}</div>
-              <button class="btn">Remove</button>
-            </div>
-          `;
-          row.querySelector('button').onclick = () => {
-            const idx = cart.findIndex(x=>x.id===c.id);
-            if (idx>=0) cart.splice(idx,1);
-            renderCart();
-          };
-          root.appendChild(row);
-        });
-
-        // simple plan
-        const planEl = document.getElementById('plan');
-        const hosts = [...new Set(cart.map(c=>c.host))];
-        const primaries = cart.filter(c => !c.conjugate || c.conjugate === 'Unconjugated');
-        const needsSecondary = primaries.length > 0;
-        const secondaryHint = needsSecondary ? `Add a secondary anti-${hosts.join('/')} IgG matching isotype for your detection system.` : 'Primaries are conjugated; no secondary needed.';
-        const appsCovered = [...new Set(cart.flatMap(c=>c.applicationValidated))].join(', ') || '—';
-
-        planEl.innerHTML = `
-          <div><span class="font-medium">Plan summary:</span> ${cart.length} antibodies selected across ${[...new Set(cart.map(c=>c.target))].length} targets.</div>
-          <div class="mt-1"><span class="font-medium">Apps covered:</span> ${appsCovered}</div>
-          <div class="mt-1"><span class="font-medium">Secondary hint:</span> ${secondaryHint}</div>
+          <div class="flex items-center gap-2">
+            <a class="btn btn-primary" href="${exp.pdfUrl}">⬇️ Download</a>
+            <button class="btn">🔁 Remix</button>
+          </div>
         `;
-        planEl.style.display = 'block';
-      }
+        div.querySelector('button').onclick = () => {
+          // Load snapshot to design and switch back to chat
+          design = exp.designSnapshot || {};
+          tabs.forEach(x=>x.classList.remove('tab-active'));
+          document.querySelector('[data-tab="chat"]').classList.add('tab-active');
+          Object.values(sections).forEach(s=>s.classList.add('hidden'));
+          sections.chat.classList.remove('hidden');
+          renderSummary();
+          messages.push({ role:'assistant', content: 'Loaded previous design. What would you like to modify?' });
+          renderMsgs();
+        };
+        expListEl.appendChild(div);
+      });
+      if (experiments.length===0) expListEl.innerHTML = '<div class="text-sm opacity-70">No experiments yet.</div>';
+    }
 
-      fetchResults();
-    </script>
-  </body>
+    // ---------- Inventory ----------
+    async function loadInventory(){
+      const r = await fetch('/api/inventory');
+      inventory = await r.json();
+      renderInventory();
+    }
+    function renderInventory(){
+      invBodyEl.innerHTML = '';
+      invCountEl.textContent = inventory.length + ' items';
+      inventory.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b last:border-0';
+        tr.innerHTML = `
+          <td class="p-3 align-top"><input type="checkbox" data-id="${item.id}"></td>
+          <td class="p-3 align-top">
+            <div class="flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl bg-neutral-200 dark:bg-zinc-800 flex items-center justify-center overflow-hidden">
+                ${item.image ? `<img src="${item.image}" class="w-full h-full object-cover"/>` : '🧪'}
+              </div>
+              <div><input class="border rounded px-2 py-1" value="${escapeHtml(item.name||'')}" data-f="name" data-id="${item.id}"></div>
+            </div>
+          </td>
+          <td class="p-3 align-top w-[30%]"><textarea class="w-full border rounded px-2 py-1" data-f="description" data-id="${item.id}">${escapeHtml(item.description||'')}</textarea></td>
+          <td class="p-3 align-top"><input class="w-full border rounded px-2 py-1" data-f="link" data-id="${item.id}" value="${escapeHtml(item.link||'')}"></td>
+          <td class="p-3 align-top"><input type="number" min="0" class="w-20 border rounded px-2 py-1" data-f="qty" data-id="${item.id}" value="${item.qty||0}"></td>
+          <td class="p-3 align-top"><input type="date" class="border rounded px-2 py-1" data-f="dateAdded" data-id="${item.id}" value="${(item.dateAdded||'').slice(0,10)}"></td>
+          <td class="p-3 align-top"><input type="date" class="border rounded px-2 py-1" data-f="expiration" data-id="${item.id}" value="${(item.expiration||'').slice(0,10)}"></td>
+        `;
+        invBodyEl.appendChild(tr);
+      });
+    }
+    // Add item
+    el('addItem').onclick = async () => {
+      const r = await fetch('/api/inventory', { method:'POST', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ name:'New item', qty:1, dateAdded: new Date().toISOString() })
+      });
+      const rec = await r.json();
+      inventory.unshift(rec); renderInventory();
+    };
+    // Update fields (debounced)
+    invBodyEl.addEventListener('change', async (e)=>{
+      const t = e.target;
+      const id = t.getAttribute('data-id'); const f = t.getAttribute('data-f'); if (!id||!f) return;
+      const val = (f==='qty') ? Number(t.value) : t.value;
+      await fetch('/api/inventory', { method:'PATCH', headers:{'content-type':'application/json'},
+        body: JSON.stringify({ id, [f]: val })
+      });
+    });
+    // Select all
+    chkAllEl.onchange = () => {
+      invBodyEl.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb => cb.checked = chkAllEl.checked);
+    };
+    // Delete selected
+    el('delSelected').onclick = async () => {
+      const ids = Array.from(invBodyEl.querySelectorAll('input[type="checkbox"][data-id]:checked')).map(cb => cb.getAttribute('data-id'));
+      if (ids.length===0) return;
+      await fetch('/api/inventory', { method:'PATCH', headers:{'content-type':'application/json'}, body: JSON.stringify({ delete:true, ids }) });
+      inventory = inventory.filter(i => !ids.includes(i.id)); renderInventory();
+    };
+    // CSV
+    el('dlCsv').onclick = () => {
+      const headers = ["Name","Description","Link","Qty","Date Added","Expiration"];
+      const rows = inventory.map(i => [i.name||'', i.description||'', i.link||'', String(i.qty||0), i.dateAdded||'', i.expiration||'']);
+      const csv = [headers.join(','), ...rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','))].join('\n');
+      const url = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+      const a = document.createElement('a'); a.href=url; a.download='inventory.csv'; a.click(); URL.revokeObjectURL(url);
+    };
+    // Inventory PDF via export API
+    el('dlInvPdf').onclick = async () => {
+      const table = [
+        ['Image','Name','Description','Link','Qty','Date Added','Expiration'],
+        ...inventory.map(i => [i.image||'', i.name||'', i.description||'', i.link||'', i.qty||0, (i.dateAdded||'').slice(0,10), (i.expiration||'').slice(0,10)])
+      ];
+      const payload = {
+        experiment: {
+          title: 'Inventory — ' + new Date().toISOString().slice(0,10),
+          summary: `Count: ${inventory.length}`,
+          inputsTable: [],
+          bomTable: table,
+          protocolHtml: ''
+        }
+      };
+      const ex = await fetch('/api/export/pdf', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) });
+      const { pdfUrl } = await ex.json();
+      location.href = pdfUrl; // download/view
+    };
+
+    // Initial loads
+    (async function init(){
+      renderMsgs();
+      await loadInventory();
+      await loadExperiments();
+    })();
+  </script>
+</body>
 </html>
