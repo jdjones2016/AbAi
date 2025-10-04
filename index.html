@@ -374,6 +374,20 @@
         const data = await r.json();
         design.selectedAntibodies = data.antibodies || [];
         design.protocolReady = true;
+
+        // >>> NEW (#5): Generate the protocol via OpenAI-backed endpoint
+        try {
+          const g = await fetch('/api/protocol/generate', {
+            method: 'POST',
+            headers: withHeaders(),
+            body: JSON.stringify({ design, inventory })
+          });
+          const { protocolHtml } = await g.json();
+          if (protocolHtml) design.protocolHtml = protocolHtml;
+        } catch (e) {
+          // If generation fails, we keep the placeholder later
+        }
+
         renderSummary();
         addAssistant("I found protocols and candidate antibodies and drafted a protocol. Review the summary on the right. Say “accept” to finalize and get a PDF, or tell me what you’d like to change.");
       }
@@ -518,11 +532,17 @@
         ...((bom.items||[]).map(it => ['', it.name, it.description, it.link, money(it.unitCost), it.units, money(it.total)])),
         ['','','','','','Grand Total', money(bom.grandTotal||0)]
       ];
+
+      // Use the generated protocol if available; else fall back to placeholder
+      const protocolHtmlFinal =
+        design.protocolHtml ||
+        "<h3>Fixation</h3><p>4% PFA 10–15 min...</p><h3>Permeabilization</h3><p>0.1% Triton X-100 10 min...</p><h3>Blocking</h3><p>1–5% BSA 30–60 min...</p><h3>Primary</h3><p>Overnight 4°C or 1–2 h RT...</p><h3>Secondary</h3><p>1 h RT, protected from light...</p><h3>Imaging</h3><p>Match channels to conjugates; avoid bleed-through...</p>";
+
       const experiment = {
         title: (design.goal || 'Staining Experiment').slice(0,80),
         summary: `Species: ${design.species||'—'} | Target: ${design.target||'—'} | Budget: ${design?.constraints?.budgetUSD ?? '—'} | Time: ${design?.constraints?.timeLimitHours ?? '—'}h`,
         inputsTable, blastResults: design.blastResult || null, bomTable,
-        protocolHtml: "<h3>Fixation</h3><p>4% PFA 10–15 min...</p><h3>Permeabilization</h3><p>0.1% Triton X-100 10 min...</p><h3>Blocking</h3><p>1–5% BSA 30–60 min...</p><h3>Primary</h3><p>Overnight 4°C or 1–2 h RT...</p><h3>Secondary</h3><p>1 h RT, protected from light...</p><h3>Imaging</h3><p>Match channels to conjugates; avoid bleed-through...</p>"
+        protocolHtml: protocolHtmlFinal
       };
 
       // 3) Generate PDF (client) and save
