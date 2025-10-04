@@ -4,23 +4,65 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>AbAI — Antibody Assistant</title>
+
+  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- PDFMAKE (client-side PDFs, free) -->
+  <script>
+    // Make dark mode class-driven for any "dark:*" utilities we keep
+    tailwind.config = { darkMode: 'class' };
+  </script>
+
+  <!-- pdfmake for client-side PDFs -->
   <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/pdfmake.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.10/build/vfs_fonts.js"></script>
+
+  <!-- Simple variables + components (no @apply so it works via CDN) -->
   <style>
-    .card { @apply rounded-2xl border border-gray-200 bg-white p-4 shadow; }
-    .btn  { @apply inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm shadow hover:shadow-md transition; }
-    .btn-primary { @apply bg-black text-white border-black; }
-    .badge { @apply inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700; }
-    .input { @apply w-full rounded-xl border border-gray-300 px-3 py-2; }
-    .tab-active { @apply bg-black text-white; }
-    .dark .card { @apply bg-zinc-900 border-zinc-800; }
-    .dark .btn { @apply border-zinc-700; }
-    .dark body { @apply bg-zinc-950 text-zinc-50; }
+    :root {
+      --card-bg: #ffffff;
+      --card-border: #e5e7eb;
+      --text-main: #0f172a;
+      --muted: #475569;
+      --chip: #eef2ff;
+      --chip-text: #3730a3;
+      --accent: #4f46e5;
+      --accent-contrast: #ffffff;
+      --assistant-bg: #f8fafc;
+      --assistant-border: #e2e8f0;
+      --user-bg: #111827;
+      --user-text: #ffffff;
+      --surface: #f5f7fb;
+    }
+    .dark {
+      --card-bg: #0b0b0c;
+      --card-border: #27272a;
+      --text-main: #fafafa;
+      --muted: #a1a1aa;
+      --chip: #1f2937;
+      --chip-text: #c7d2fe;
+      --accent: #6366f1;
+      --accent-contrast: #0b0b0c;
+      --assistant-bg: #18181b;
+      --assistant-border: #27272a;
+      --user-bg: #4f46e5;
+      --user-text: #ffffff;
+      --surface: #0a0a0b;
+    }
+    body { color: var(--text-main); background: var(--surface); }
+    .card { border:1px solid var(--card-border); background:var(--card-bg); border-radius:1rem; padding:1rem; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .btn { display:inline-flex;align-items:center;gap:.5rem;border:1px solid var(--card-border);padding:.5rem .75rem;border-radius:.75rem;background:var(--card-bg);color:var(--text-main);box-shadow:0 1px 1px rgba(0,0,0,.05); }
+    .btn:hover{ box-shadow:0 2px 6px rgba(0,0,0,.08); }
+    .btn-primary{ background:var(--accent); color:var(--accent-contrast); border-color:var(--accent); }
+    .badge{ display:inline-flex;align-items:center;border-radius:999px;background:var(--chip);color:var(--chip-text);padding:.25rem .5rem;font-size:.75rem;font-weight:500 }
+    .input{ width:100%; border:1px solid var(--card-border); padding:.5rem .75rem; border-radius:.75rem; background:var(--card-bg); color:var(--text-main) }
+    .tab-active{ background:var(--accent); color:var(--accent-contrast); }
+    .bubble-a { background:var(--assistant-bg); border:1px solid var(--assistant-border); }
+    .bubble-u { background:var(--user-bg); color:var(--user-text); }
+    .divider { height:1px; background: var(--card-border); margin:.75rem 0; }
+    a.link { color: var(--accent); text-decoration: underline; }
   </style>
 </head>
-<body class="bg-neutral-50 text-neutral-900">
+<body>
   <main class="max-w-7xl mx-auto px-4 py-6">
     <!-- Top bar -->
     <div class="flex items-center justify-between gap-4">
@@ -40,44 +82,42 @@
     </div>
 
     <!-- CHAT -->
-    <section id="chat" class="grid md:grid-cols-[1fr_360px] gap-6 mt-6">
+    <section id="chat" class="grid md:grid-cols-[1fr_380px] gap-6 mt-6">
       <!-- Messages -->
       <div class="card">
         <div id="msgs" class="h-[64vh] overflow-auto space-y-4 pr-1">
-          <!-- assistant greeting will render here -->
+          <!-- assistant greeting -->
         </div>
 
-        <!-- Composer -->
-        <div class="border-t mt-3 pt-3">
-          <div class="flex items-center gap-2">
-            <label class="btn cursor-pointer">
-              📎 Attach images
-              <input id="files" type="file" accept="image/*" multiple class="hidden">
-            </label>
-            <input id="input" class="input flex-1" placeholder="Type your message… (Enter to send)">
-            <button id="send" class="btn btn-primary">Send</button>
-          </div>
-          <div id="attached" class="flex gap-2 mt-2 flex-wrap text-xs"></div>
-          <div class="flex gap-2 mt-2">
-            <button id="extractEq" class="btn">🔍 Extract equipment from images</button>
-            <button id="searchNow" class="btn">🌐 Search now</button>
-            <button id="runBlast" class="btn">🧬 Run BLAST</button>
-            <button id="genPdf" class="btn btn-primary">📄 Generate PDF & Save</button>
-          </div>
+        <!-- Composer (no extra action buttons) -->
+        <div class="divider"></div>
+        <div class="flex items-center gap-2">
+          <label class="btn cursor-pointer">
+            📎 Attach images
+            <input id="files" type="file" accept="image/*" multiple class="hidden">
+          </label>
+          <input id="input" class="input flex-1" placeholder="Describe your plan (Enter to send)">
+          <button id="send" class="btn btn-primary">Send</button>
         </div>
+        <div id="attached" class="flex gap-2 mt-2 flex-wrap text-xs"></div>
       </div>
 
-      <!-- Right panel: summary -->
+      <!-- Right panel -->
       <div class="space-y-4">
         <div class="card">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between mb-1">
             <h3 class="font-semibold">Design Summary</h3>
             <span id="protoReady" class="text-xs opacity-70">protocol: not ready</span>
           </div>
-          <div id="summary" class="mt-3 text-sm space-y-1"></div>
-          <div class="mt-3">
+          <div id="summary" class="mt-2 text-sm space-y-1"></div>
+
+          <div class="mt-4">
             <h4 class="font-semibold mb-1">Antibody Panel</h4>
             <div id="panel" class="text-sm space-y-2"></div>
+          </div>
+
+          <div class="mt-4 hidden" id="downloadRow">
+            <button id="downloadPdf" class="btn btn-primary">⬇️ Download PDF</button>
           </div>
         </div>
       </div>
@@ -124,18 +164,13 @@
           <tbody id="invBody"></tbody>
         </table>
       </div>
-      <div class="text-xs opacity-70">* Expiration will be checked during planning; expired items are excluded unless overridden.</div>
+      <div class="text-xs opacity-70">* Expiration is checked during planning; expired items are excluded unless overridden.</div>
     </section>
   </main>
 
   <script>
-    // ================== CONFIG (optional) ==================
-    // If you set an ABAI_TOKEN in Cloudflare Pages (Settings → Environment Variables),
-    // put the same value here to send it with every request.
-    // Leave as null if you didn't set a token.
+    /* --------------------- CONFIG --------------------- */
     const CLIENT_ABAI_TOKEN = null; // e.g., "my-shared-secret"
-
-    // Helper to add common headers (and optional token)
     function withHeaders(base = {}, isMultipart = false) {
       const h = new Headers(base);
       if (!isMultipart && !h.has('content-type')) h.set('content-type', 'application/json');
@@ -143,153 +178,48 @@
       return h;
     }
 
-    // ================== PDF HELPERS (client-side) ==================
-    function money(n) { return n == null ? '—' : `$${Number(n).toFixed(2)}`; }
-
-    function docForExperiment(exp) {
-      const { title, summary, inputsTable, bomTable, blastResults, protocolHtml } = exp;
-
-      function tableFrom(rows) {
-        if (!rows || !rows.length) return { text: '—', margin: [0,4,0,0] };
-        const header = rows[0].map(h => ({ text: String(h), style: 'th' }));
-        const body = [header, ...rows.slice(1).map(r => r.map(c => ({ text: String(c ?? '') })))];
-        return {
-          table: { headerRows: 1, widths: Array(header.length).fill('*'), body },
-          layout: 'lightHorizontalLines',
-          margin: [0, 6, 0, 12]
-        };
-      }
-
-      function stripHtml(html) {
-        const div = document.createElement('div'); div.innerHTML = html || '';
-        return div.textContent || div.innerText || '';
-      }
-
-      return {
-        pageSize: 'A4',
-        pageMargins: [36, 48, 36, 54],
-        footer: (current, total) => ({
-          columns: [
-            { text: 'AbAI — Antibody Assistant', style: 'footerLeft' },
-            { text: `Page ${current} of ${total}`, alignment: 'right', style: 'footerRight' }
-          ],
-          margin: [36, 6, 36, 12]
-        }),
-        content: [
-          { text: title || 'Staining Experiment', style: 'h1' },
-          { text: summary || '', style: 'summary' },
-          { text: 'Inputs', style: 'h2', margin: [0, 16, 0, 4] },
-          tableFrom(inputsTable),
-          ...(blastResults ? [
-            { text: 'BLAST Results', style: 'h2', margin: [0, 8, 0, 4] },
-            { text: JSON.stringify(blastResults, null, 2), style: 'code' }
-          ] : []),
-          { text: 'Bill of Materials', style: 'h2', margin: [0, 8, 0, 4] },
-          tableFrom(bomTable),
-          { text: 'Protocol', style: 'h2', margin: [0, 8, 0, 4], pageBreak: 'before' },
-          { text: stripHtml(protocolHtml), style: 'body' }
-        ],
-        styles: {
-          h1: { fontSize: 20, bold: true, margin: [0, 0, 0, 8] },
-          h2: { fontSize: 14, bold: true },
-          summary: { margin: [0, 4, 0, 8] },
-          th: { bold: true, fillColor: '#efefef' },
-          code: { fontSize: 9, color: '#333', margin: [0, 2, 0, 8] },
-          body: { fontSize: 11 },
-          footerLeft: { fontSize: 9, color: '#666' },
-          footerRight: { fontSize: 9, color: '#666' }
-        },
-        defaultStyle: { fontSize: 11 }
-      };
-    }
-
-    function docForInventory(inv) {
-      const rows = [
-        ['Name','Description','Link','Qty','Date Added','Expiration'],
-        ...inv.map(i => [
-          i.name || '', i.description || '', i.link || '', String(i.qty || 0),
-          (i.dateAdded || '').slice(0,10), (i.expiration || '').slice(0,10)
-        ])
-      ];
-      return {
-        pageSize: 'A4',
-        pageMargins: [36, 48, 36, 54],
-        content: [
-          { text: 'Inventory', style: 'h1' },
-          {
-            table: {
-              headerRows: 1,
-              widths: ['*','*','*','auto','auto','auto'],
-              body: [
-                rows[0].map(h => ({ text: h, style: 'th' })),
-                ...rows.slice(1).map(r => r.map(c => ({ text: String(c ?? '') })))
-              ]
-            },
-            layout: 'lightHorizontalLines'
-          }
-        ],
-        styles: {
-          h1: { fontSize: 20, bold: true, margin: [0, 0, 0, 12] },
-          th: { bold: true, fillColor: '#efefef' }
-        },
-        defaultStyle: { fontSize: 11 }
-      };
-    }
-
-    // ================== State / Elements ==================
-    const el = (id) => document.getElementById(id);
-    const msgsEl = el('msgs');
-    const inputEl = el('input');
-    const filesEl = el('files');
-    const attachedEl = el('attached');
-    const protoReadyEl = el('protoReady');
-    const summaryEl = el('summary');
-    const panelEl = el('panel');
-    const expListEl = el('expList');
-    const invBodyEl = el('invBody');
-    const invCountEl = el('invCount');
-    const chkAllEl = el('chkAll');
-
+    /* --------------------- THEME ---------------------- */
     let dark = false;
-    let uploads = []; // {name, file}
-    let messages = [{ role:'assistant', content: "Hi! I’m AbAI. Tell me your staining goal (e.g., ‘Assess skeletal muscle differentiation in primary satellite cells’). I’ll gather details, search protocols/antibodies, and generate a protocol + shopping PDF." }];
-    let design = {};     // filled step-by-step
-    let inventory = [];  // fetched from API
-    let experiments = []; // fetched from API
-
-    // ================== Tabs ==================
-    const tabs = document.querySelectorAll('[data-tab]');
-    const sections = { chat: el('chat'), experiments: el('experiments'), inventory: el('inventory') };
-    tabs.forEach(b=>{
-      b.onclick = () => {
-        tabs.forEach(x=>x.classList.remove('tab-active'));
-        b.classList.add('tab-active');
-        Object.values(sections).forEach(s=>s.classList.add('hidden'));
-        sections[b.dataset.tab].classList.remove('hidden');
-        if (b.dataset.tab==='experiments') loadExperiments();
-        if (b.dataset.tab==='inventory') loadInventory();
-      };
-    });
-
-    // ================== Dark mode ==================
-    el('mode').onclick = () => {
+    const modeBtn = document.getElementById('mode');
+    modeBtn.onclick = () => {
       dark = !dark;
       document.documentElement.classList.toggle('dark', dark);
-      el('mode').textContent = dark ? "☀️ Light mode" : "🌙 Dark mode";
+      modeBtn.textContent = dark ? '☀️ Light mode' : '🌙 Dark mode';
     };
 
-    // ================== Render Helpers ==================
+    /* -------------------- ELEMENTS -------------------- */
+    const el = (id) => document.getElementById(id);
+    const msgsEl = el('msgs'), inputEl = el('input'), filesEl = el('files'),
+          attachedEl = el('attached'), protoReadyEl = el('protoReady'),
+          summaryEl = el('summary'), panelEl = el('panel'), expListEl = el('expList'),
+          invBodyEl = el('invBody'), invCountEl = el('invCount'),
+          chkAllEl = el('chkAll'), downloadRow = el('downloadRow'),
+          downloadPdfBtn = el('downloadPdf');
+
+    /* --------------------- STATE ---------------------- */
+    let uploads = []; // {name, file}
+    let messages = [];
+    let design = {};             // live design (facts)
+    let inventory = [];
+    let experiments = [];
+    let lastPdfUrl = null;
+
+    /* --------------- HELPER: RENDERING --------------- */
     function escapeHtml(s){ return (s||'').replace(/[&<>\"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    function renderMsgs() {
-      msgsEl.innerHTML = '';
-      messages.forEach(m => {
-        const bubble = document.createElement('div');
-        bubble.className = 'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow ' + (m.role==='assistant' ? 'bg-neutral-100 dark:bg-zinc-800' : 'bg-black text-white dark:bg-zinc-100 dark:text-zinc-900 ml-auto');
-        bubble.innerHTML = '<div class="opacity-70 text-xs mb-1">' + (m.role==='assistant' ? 'AbAI' : 'You') + '</div>' + escapeHtml(m.content);
-        msgsEl.appendChild(bubble);
-      });
-      msgsEl.scrollTop = msgsEl.scrollHeight;
+    function addAssistant(text) {
+      const wrap = document.createElement('div');
+      wrap.className = 'max-w-[80%] bubble-a rounded-2xl px-4 py-3 text-sm leading-relaxed shadow';
+      wrap.innerHTML = `<div class="opacity-70 text-xs mb-1">AbAI</div>${escapeHtml(text)}`;
+      msgsEl.appendChild(wrap); msgsEl.scrollTop = msgsEl.scrollHeight;
+      messages.push({ role:'assistant', content:text });
+    }
+    function addUser(text) {
+      const wrap = document.createElement('div');
+      wrap.className = 'max-w-[80%] bubble-u rounded-2xl px-4 py-3 text-sm leading-relaxed shadow ml-auto';
+      wrap.innerHTML = `<div class="opacity-70 text-xs mb-1">You</div>${escapeHtml(text)}`;
+      msgsEl.appendChild(wrap); msgsEl.scrollTop = msgsEl.scrollHeight;
+      messages.push({ role:'user', content:text });
     }
 
     function renderSummary() {
@@ -310,104 +240,271 @@
       (d.selectedAntibodies||[]).forEach(a => {
         const div = document.createElement('div');
         div.className = 'border rounded-xl p-2 flex items-center justify-between';
-        div.innerHTML = '<div><div class="font-medium">'+escapeHtml(a.name)+'</div><div class="text-xs opacity-70">'+(a.isPrimary?'Primary':'Secondary')+' • '+(a.vendor||'—')+(a.conjugate?(' • '+a.conjugate):'')+'</div></div><div class="text-xs opacity-70">'+(a.reactivity||[]).join('/')+'</div>';
+        div.innerHTML = `<div><div class="font-medium">${escapeHtml(a.name)}</div><div class="text-xs opacity-70">${a.isPrimary?'Primary':'Secondary'} • ${escapeHtml(a.vendor||'—')}${a.conjugate?(' • '+escapeHtml(a.conjugate)):""}</div></div><div class="text-xs opacity-70">${(a.reactivity||[]).join('/')}</div>`;
         panelEl.appendChild(div);
       });
       if (!d.selectedAntibodies || d.selectedAntibodies.length===0){
         panelEl.innerHTML = '<div class="text-xs opacity-70">No antibodies selected yet.</div>';
       }
 
-      function row(k,v){ return '<div class="flex items-start justify-between gap-4"><div class="opacity-70">'+k+'</div><div class="text-right font-medium max-w-[60%]">'+escapeHtml(String(v))+'</div></div>'; }
+      function row(k,v){ return `<div class="flex items-start justify-between gap-4"><div class="opacity-70">${k}</div><div class="text-right font-medium max-w-[60%]">${escapeHtml(String(v))}</div></div>`; }
     }
 
     function renderUploads() {
-      attachedEl.innerHTML = uploads.map(u => '<span class="badge">'+escapeHtml(u.name)+'</span>').join(' ');
+      attachedEl.innerHTML = uploads.map(u => `<span class="badge">${escapeHtml(u.name)}</span>`).join(' ');
     }
 
-    // ================== Greeting ==================
-    renderMsgs(); renderSummary();
+    /* --------------- FACT EXTRACTION (client) --------------- */
+    // Extract as much as possible from each user message so we never re-ask
+    const speciesLex = {
+      human:['human','h.sapiens','homo sapiens'],
+      mouse:['mouse','mice','murine','mus musculus','m. musculus'],
+      rat:['rat','rattus'],
+      cow:['cow','bovine','cattle','bos taurus','b. taurus'],
+      pig:['pig','porcine','sus scrofa'],
+      sheep:['sheep','ovine','o. aries','ovis aries'],
+      rabbit:['rabbit','lapine'],
+      zebrafish:['zebrafish','danio rerio','d. rerio'],
+      fly:['drosophila','fruit fly','d. melanogaster'],
+      yeast:['yeast','s. cerevisiae','saccharomyces'],
+      dog:['dog','canine','canis lupus familiaris']
+    };
+    function detectSpecies(t){
+      const L=t.toLowerCase();
+      for (const k in speciesLex){
+        if (speciesLex[k].some(s => L.includes(s))) return k;
+      }
+      return null;
+    }
+    function detectBudget(t){
+      // $500, 500 dollars, under 300
+      const m1 = t.match(/\$?\s*([0-9]{2,6})(\s*(usd|dollars))?\b/i);
+      if (m1) return Number(m1[1]);
+      const m2 = t.match(/under\s+\$?\s*([0-9]{2,6})/i);
+      if (m2) return Number(m2[1]);
+      return null;
+    }
+    function detectTimeLimit(t){
+      const m = t.match(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|day|days|d)\b/i);
+      if (!m) return null;
+      const n = parseFloat(m[1]);
+      const unit = m[2].toLowerCase();
+      return /d/.test(unit) ? n*24 : n;
+    }
+    function detectTarget(t){
+      // crude: look for phrases after "target", "marker", "antibody against", "using"
+      const r = t.match(/\b(target|marker|using|stain(?:ing)? for|antibody against)\s+([A-Za-z0-9\-\/\s]{2,40})/i);
+      if (r) {
+        const cand = r[2].trim().replace(/\.$/,'');
+        if (cand.length>=2) return cand;
+      }
+      // uppercase gene/protein tokens like MYOGENIN, DESMIN, MYH1
+      const g = t.match(/\b([A-Z0-9]{3,12})\b(?!\s*cells)/);
+      if (g) return g[1];
+      return null;
+    }
+    function detectGoal(t){
+      // if large sentence and we don't have a goal, use it as the goal
+      if ((t||'').length > 20) return t.trim();
+      return null;
+    }
+    function mergeFactsFromText(text){
+      const patch = {};
+      if (!design.goal) { const g = detectGoal(text); if (g) patch.goal = g; }
+      if (!design.species) { const s = detectSpecies(text); if (s) patch.species = s; }
+      if (!design.target) { const tg = detectTarget(text); if (tg) patch.target = tg; }
+      const budget = detectBudget(text);
+      const time = detectTimeLimit(text);
+      if (budget != null || time != null) {
+        patch.constraints = { ...(design.constraints||{}) };
+        if (budget != null) patch.constraints.budgetUSD = budget;
+        if (time != null) patch.constraints.timeLimitHours = time;
+      }
+      if (Object.keys(patch).length) {
+        design = { ...design, ...patch, constraints: patch.constraints || design.constraints };
+      }
+    }
+    function nextMissingPrompt(){
+      if (!design.goal) return "What's your experimental goal?";
+      if (!design.species) return "Which species are the cells/tissue from?";
+      if (!design.target) return "What protein/structure are you targeting?";
+      if (!design.availableEquipment || design.availableEquipment.length===0) return "Optionally, attach microscope/equipment photos — I can auto-detect models/channels.";
+      if (!design.constraints || design.constraints.budgetUSD == null || design.constraints.timeLimitHours == null) return "Any constraints? (budget in USD, and time limit in hours)";
+      return null;
+    }
+    function adjustAssistantPrompt(text){
+      // If backend repeated a question we've already answered, replace with the next missing field
+      const need = nextMissingPrompt();
+      if (!need) return text;
+      // If the message looks like it's asking for something we already have, swap.
+      const L = (text||'').toLowerCase();
+      const repeats = (design.species && L.includes('which species')) ||
+                      (design.target && /target|protein|structure/.test(L)) ||
+                      (design.goal && L.includes('goal'));
+      return repeats ? need : text || need;
+    }
 
-    // ================== Chat send ==================
-    el('send').onclick = send;
+    /* ---------------- AUTO ACTION ENGINE ---------------- */
+    let ocrQueued = false, searchQueued = false, blastQueued = false, finalAsked = false, finalized = false;
+
+    async function autoActions() {
+      // 1) OCR immediately after images are attached (once per batch)
+      if (uploads.length && !ocrQueued) {
+        ocrQueued = true;
+        try {
+          const fd = new FormData(); uploads.forEach(u => u.file && fd.append('file', u.file, u.name));
+          const r = await fetch('/api/equipment/ocr', { method:'POST', headers: withHeaders({}, true), body: fd });
+          const eq = await r.json();
+          if (eq.equipment?.length){
+            const set = new Set([...(design.availableEquipment||[]), ...eq.equipment]);
+            design.availableEquipment = Array.from(set);
+            addAssistant("I detected equipment: " + design.availableEquipment.join(', '));
+            renderSummary();
+          }
+        } catch {}
+      }
+
+      // 2) Search once we have enough info
+      if (!searchQueued && design.goal && design.species && design.target) {
+        searchQueued = true;
+        const r = await fetch('/api/search', {
+          method:'POST', headers: withHeaders(),
+          body: JSON.stringify({ goal: design.goal, species: design.species, target: design.target, constraints: design.constraints })
+        });
+        const data = await r.json();
+        design.selectedAntibodies = data.antibodies || [];
+        design.protocolReady = true;
+        renderSummary();
+        addAssistant("I found protocols and candidate antibodies and drafted a protocol. Review the summary on the right. Say “accept” to finalize and get a PDF, or tell me what you’d like to change.");
+      }
+
+      // 3) Heuristic BLAST trigger (exotic species OR no antibodies found)
+      const common = ['human','mouse','rat','cow','pig','sheep','rabbit','dog','zebrafish','fly','yeast'];
+      const exotic = design.species && !common.includes(String(design.species).toLowerCase());
+      const noAb = Array.isArray(design.selectedAntibodies) && design.selectedAntibodies.length === 0;
+      if (!blastQueued && (exotic || noAb) && design.species && design.target) {
+        blastQueued = true;
+        const r = await fetch('/api/epitope/blast', {
+          method:'POST', headers: withHeaders(),
+          body: JSON.stringify({ target: design.target, species: design.species })
+        });
+        const b = await r.json();
+        design.blastResult = b;
+        design.blastRequired = true;
+        renderSummary();
+        addAssistant(`I ran a BLAST-based epitope search. Best hit: ${b.bestHitTarget} (identity ${b.identityPct}%). I’ll use the closest antibody within your constraints.`);
+      }
+
+      // 4) Ask for missing facts (only if we still need them)
+      const need = nextMissingPrompt();
+      if (need && !finalAsked) {
+        addAssistant(need);
+      }
+    }
+
+    /* ------------------ PDF HELPERS ------------------ */
+    function money(n) { return n == null ? '—' : `$${Number(n).toFixed(2)}`; }
+    function docForExperiment(exp) {
+      const { title, summary, inputsTable, bomTable, blastResults, protocolHtml } = exp;
+      function tableFrom(rows) {
+        if (!rows || !rows.length) return { text: '—', margin: [0,4,0,0] };
+        const header = rows[0].map(h => ({ text: String(h), style: 'th' }));
+        const body = [header, ...rows.slice(1).map(r => r.map(c => ({ text: String(c ?? '') })))];
+        return { table: { headerRows: 1, widths: Array(header.length).fill('*'), body }, layout: 'lightHorizontalLines', margin: [0, 6, 0, 12] };
+      }
+      function stripHtml(html) { const div=document.createElement('div'); div.innerHTML = html||''; return div.textContent||div.innerText||''; }
+      return {
+        pageSize: 'A4', pageMargins: [36, 48, 36, 54],
+        footer: (c,t)=>({ columns:[{text:'AbAI — Antibody Assistant',style:'footerLeft'},{text:`Page ${c} of ${t}`,alignment:'right',style:'footerRight'}], margin:[36,6,36,12]}),
+        content: [
+          { text: title || 'Staining Experiment', style: 'h1' },
+          { text: summary || '', style: 'summary' },
+          { text: 'Inputs', style: 'h2', margin: [0, 16, 0, 4] }, tableFrom(inputsTable),
+          ...(blastResults ? [{ text:'BLAST Results', style:'h2', margin:[0,8,0,4] }, { text: JSON.stringify(blastResults,null,2), style: 'code' }] : []),
+          { text:'Bill of Materials', style:'h2', margin:[0,8,0,4] }, tableFrom(bomTable),
+          { text:'Protocol', style:'h2', margin:[0,8,0,4], pageBreak:'before' }, { text: stripHtml(protocolHtml), style:'body' }
+        ],
+        styles: { h1:{fontSize:20,bold:true,margin:[0,0,0,8]}, h2:{fontSize:14,bold:true}, summary:{margin:[0,4,0,8]}, th:{bold:true,fillColor:'#efefef'}, code:{fontSize:9,color:'#333',margin:[0,2,0,8]}, body:{fontSize:11}, footerLeft:{fontSize:9,color:'#666'}, footerRight:{fontSize:9,color:'#666'} },
+        defaultStyle: { fontSize: 11 }
+      };
+    }
+    function docForInventory(inv) {
+      const rows = [
+        ['Name','Description','Link','Qty','Date Added','Expiration'],
+        ...inv.map(i => [i.name||'', i.description||'', i.link||'', String(i.qty||0), (i.dateAdded||'').slice(0,10), (i.expiration||'').slice(0,10)])
+      ];
+      return {
+        pageSize:'A4', pageMargins:[36,48,36,54],
+        content:[
+          { text:'Inventory', style:'h1' },
+          { table: { headerRows:1, widths:['*','*','*','auto','auto','auto'], body: [ rows[0].map(h=>({text:h,style:'th'})), ...rows.slice(1).map(r=>r.map(c=>({text:String(c??'')}))) ] }, layout:'lightHorizontalLines' }
+        ],
+        styles:{ h1:{fontSize:20,bold:true,margin:[0,0,0,12]}, th:{bold:true,fillColor:'#efefef'} },
+        defaultStyle:{ fontSize:11 }
+      };
+    }
+
+    /* -------------------- CHAT LOOP -------------------- */
+    function renderGreeting(){
+      addAssistant("Hi! I’m AbAI. Tell me your staining goal in one message (e.g., “I’d like to stain fixed primary satellite cells from **cow** for **myosin heavy chain**. Budget **$400** and need results in **24 hours**.”). Attach microscope/equipment photos if you have them — I’ll auto-detect models/channels.");
+    }
+
+    document.getElementById('send').onclick = send;
     inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ send(); }});
-    filesEl.onchange = () => {
+    filesEl.onchange = async () => {
       uploads = uploads.concat(Array.from(filesEl.files || []).map(f => ({ name: f.name, file: f })));
       renderUploads();
+      ocrQueued = false; // allow OCR on new batch
+      autoActions();
     };
 
     async function send() {
       const text = inputEl.value.trim();
       if (!text && uploads.length===0) return;
-
-      // Add user message
-      messages.push({ role:'user', content: text });
-      renderMsgs();
       inputEl.value = '';
+      addUser(text);
 
+      // Local extraction first so we never re-ask
+      mergeFactsFromText(text);
+      renderSummary();
+
+      // If user accepts, finalize immediately
+      if (/^(accept|looks good|finalize|generate|ok)$/i.test(text) && design.protocolReady && !finalized) {
+        await finalizeAndSave();
+        return;
+      }
+
+      // Call orchestrator (still useful), but adapt its prompt if it repeats
       try {
         const res = await fetch('/api/llm/plan-step', {
-          method: 'POST',
-          headers: withHeaders(),
+          method: 'POST', headers: withHeaders(),
           body: JSON.stringify({ messages, design, inventory })
         });
         const json = await res.json();
-        if (json.facts_patch) design = { ...design, ...json.facts_patch };
-        messages.push({ role:'assistant', content: json.assistant_message || '(no response)' });
-      } catch (e) {
-        messages.push({ role:'assistant', content: 'Sorry, I hit a network error calling /api/llm/plan-step.' });
+        if (json.facts_patch) { design = { ...design, ...json.facts_patch }; renderSummary(); }
+        const assistantText = adjustAssistantPrompt(json.assistant_message || '');
+        if (assistantText) addAssistant(assistantText);
+      } catch {
+        // If network fails, continue with our own progression
+        const need = nextMissingPrompt();
+        if (need) addAssistant(need);
       }
-      renderMsgs(); renderSummary();
+
+      // Then run any auto-actions that are now unblocked by new facts
+      autoActions();
     }
 
-    // ================== Buttons ==================
-    el('extractEq').onclick = async () => {
-      if (uploads.length===0) { alert('Attach at least one image first.'); return; }
-      const fd = new FormData();
-      uploads.forEach(u => u.file && fd.append('file', u.file, u.name));
-      const r = await fetch('/api/equipment/ocr', { method: 'POST', headers: withHeaders({}, true), body: fd });
-      const eq = await r.json();
-      if (eq.equipment?.length){
-        const set = new Set([...(design.availableEquipment||[]), ...eq.equipment]);
-        design.availableEquipment = Array.from(set);
-        renderSummary();
-        messages.push({ role:'assistant', content: 'I detected equipment: ' + design.availableEquipment.join(', ') });
-        renderMsgs();
-      }
-    };
-
-    el('searchNow').onclick = async () => {
-      const r = await fetch('/api/search', {
-        method:'POST', headers: withHeaders(),
-        body: JSON.stringify({ goal: design.goal, species: design.species, target: design.target, constraints: design.constraints })
-      });
-      const data = await r.json();
-      design.selectedAntibodies = data.antibodies || [];
-      design.protocolReady = true;
-      messages.push({ role:'assistant', content: 'I found protocols and candidate antibodies. Protocol is ready to assemble.' });
-      renderMsgs(); renderSummary();
-    };
-
-    el('runBlast').onclick = async () => {
-      const r = await fetch('/api/epitope/blast', {
-        method:'POST', headers: withHeaders(),
-        body: JSON.stringify({ target: design.target, species: design.species })
-      });
-      const b = await r.json();
-      design.blastResult = b;
-      messages.push({ role:'assistant', content: `BLAST result: best hit ${b.bestHitTarget}, identity ${b.identityPct}%` });
-      renderMsgs(); renderSummary();
-    };
-
-    // ---- UPDATED: Client-side PDF for Experiment ----
-    el('genPdf').onclick = async () => {
-      // 1) Build shopping list
+    // Finalize -> build BoM -> generate PDF -> save experiment -> show Download button
+    async function finalizeAndSave() {
+      addAssistant("Great — finalizing your protocol and shopping list…");
+      // 1) BoM
       const bomRes = await fetch('/api/shop/build-list', {
         method:'POST', headers: withHeaders(),
         body: JSON.stringify({ design, inventory })
       });
       const bom = await bomRes.json();
 
-      // 2) Build tables for export
+      // 2) Tables for PDF
       const inputsTable = [
         ['Goal', design.goal||'—'],
         ['Species', design.species||'—'],
@@ -418,35 +515,33 @@
       ];
       const bomTable = [
         ['Image','Name','Description','Link','Unit Cost','Qty','Total'],
-        ...((bom.items||[]).map(it => [
-          '', // omit image in PDF (CORS); can be added later as data URL
-          it.name, it.description, it.link, money(it.unitCost), it.units, money(it.total)
-        ])),
+        ...((bom.items||[]).map(it => ['', it.name, it.description, it.link, money(it.unitCost), it.units, money(it.total)])),
         ['','','','','','Grand Total', money(bom.grandTotal||0)]
       ];
-
       const experiment = {
         title: (design.goal || 'Staining Experiment').slice(0,80),
         summary: `Species: ${design.species||'—'} | Target: ${design.target||'—'} | Budget: ${design?.constraints?.budgetUSD ?? '—'} | Time: ${design?.constraints?.timeLimitHours ?? '—'}h`,
-        inputsTable,
-        blastResults: design.blastResult || null,
-        bomTable,
+        inputsTable, blastResults: design.blastResult || null, bomTable,
         protocolHtml: "<h3>Fixation</h3><p>4% PFA 10–15 min...</p><h3>Permeabilization</h3><p>0.1% Triton X-100 10 min...</p><h3>Blocking</h3><p>1–5% BSA 30–60 min...</p><h3>Primary</h3><p>Overnight 4°C or 1–2 h RT...</p><h3>Secondary</h3><p>1 h RT, protected from light...</p><h3>Imaging</h3><p>Match channels to conjugates; avoid bleed-through...</p>"
       };
 
-      // 3) Build PDF (client-side) and save the data URL
+      // 3) Generate PDF (client) and save
       const doc = docForExperiment(experiment);
       pdfMake.createPdf(doc).getDataUrl(async (dataUrl) => {
+        lastPdfUrl = dataUrl;
         await fetch('/api/experiments', {
           method:'POST', headers: withHeaders(),
           body: JSON.stringify({ title: experiment.title, summary: experiment.summary, pdfUrl: dataUrl, designSnapshot: design })
         });
-        messages.push({ role:'assistant', content: 'Your experiment was saved with a real PDF. See “My Experiments” to download or remix.' });
-        renderMsgs();
+        addAssistant("Your experiment has been saved. Click **Download PDF** or visit **My Experiments** to re-download or remix.");
+        downloadRow.classList.remove('hidden');
+        finalized = true;
       });
-    };
+    }
 
-    // ================== Experiments ==================
+    downloadPdfBtn.onclick = () => { if (lastPdfUrl) window.open(lastPdfUrl, '_blank'); };
+
+    /* ----------------- EXPERIMENTS TAB ----------------- */
     async function loadExperiments(){
       const r = await fetch('/api/experiments', { headers: withHeaders() });
       experiments = await r.json();
@@ -461,33 +556,34 @@
             <div class="text-sm mt-1">${escapeHtml(exp.summary||'')}</div>
           </div>
           <div class="flex items-center gap-2">
-            <a class="btn btn-primary" href="${exp.pdfUrl}">⬇️ Download</a>
+            <a class="btn btn-primary" href="${exp.pdfUrl}" target="_blank" rel="noopener">⬇️ Download</a>
             <button class="btn">🔁 Remix</button>
           </div>
         `;
         div.querySelector('button').onclick = () => {
-          // Load snapshot to design and switch back to chat
           design = exp.designSnapshot || {};
-          tabs.forEach(x=>x.classList.remove('tab-active'));
+          // reset run flags so autos can re-run with modified design
+          ocrQueued=false; searchQueued=false; blastQueued=false; finalAsked=false; finalized=false; lastPdfUrl=null;
+          downloadRow.classList.add('hidden');
+          // switch back to chat
+          document.querySelectorAll('[data-tab]').forEach(x=>x.classList.remove('tab-active'));
           document.querySelector('[data-tab="chat"]').classList.add('tab-active');
-          Object.values(sections).forEach(s=>s.classList.add('hidden'));
-          sections.chat.classList.remove('hidden');
+          document.getElementById('experiments').classList.add('hidden');
+          document.getElementById('chat').classList.remove('hidden');
           renderSummary();
-          messages.push({ role:'assistant', content: 'Loaded previous design. What would you like to modify?' });
-          renderMsgs();
+          addAssistant('Loaded the previous design. Tell me what you want to change; I will update the plan automatically.');
         };
         expListEl.appendChild(div);
       });
       if (experiments.length===0) expListEl.innerHTML = '<div class="text-sm opacity-70">No experiments yet.</div>';
     }
 
-    // ================== Inventory ==================
+    /* ------------------ INVENTORY TAB ------------------ */
     async function loadInventory(){
       const r = await fetch('/api/inventory', { headers: withHeaders() });
       inventory = await r.json();
       renderInventory();
     }
-
     function renderInventory(){
       invBodyEl.innerHTML = '';
       invCountEl.textContent = inventory.length + ' items';
@@ -513,8 +609,6 @@
         invBodyEl.appendChild(tr);
       });
     }
-
-    // Add item
     el('addItem').onclick = async () => {
       const r = await fetch('/api/inventory', { method:'POST', headers: withHeaders(),
         body: JSON.stringify({ name:'New item', qty:1, dateAdded: new Date().toISOString() })
@@ -522,31 +616,18 @@
       const rec = await r.json();
       inventory.unshift(rec); renderInventory();
     };
-
-    // Update fields
     invBodyEl.addEventListener('change', async (e)=>{
-      const t = e.target;
-      const id = t.getAttribute('data-id'); const f = t.getAttribute('data-f'); if (!id||!f) return;
+      const t = e.target; const id = t.getAttribute('data-id'); const f = t.getAttribute('data-f'); if (!id||!f) return;
       const val = (f==='qty') ? Number(t.value) : t.value;
-      await fetch('/api/inventory', { method:'PATCH', headers: withHeaders(),
-        body: JSON.stringify({ id, [f]: val })
-      });
+      await fetch('/api/inventory', { method:'PATCH', headers: withHeaders(), body: JSON.stringify({ id, [f]: val }) });
     });
-
-    // Select all
-    chkAllEl.onchange = () => {
-      invBodyEl.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb => cb.checked = chkAllEl.checked);
-    };
-
-    // Delete selected
+    chkAllEl.onchange = () => { invBodyEl.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb => cb.checked = chkAllEl.checked); };
     el('delSelected').onclick = async () => {
       const ids = Array.from(invBodyEl.querySelectorAll('input[type="checkbox"][data-id]:checked')).map(cb => cb.getAttribute('data-id'));
-      if (ids.length===0) return;
+      if (!ids.length) return;
       await fetch('/api/inventory', { method:'PATCH', headers: withHeaders(), body: JSON.stringify({ delete:true, ids }) });
       inventory = inventory.filter(i => !ids.includes(i.id)); renderInventory();
     };
-
-    // CSV download
     el('dlCsv').onclick = () => {
       const headers = ["Name","Description","Link","Qty","Date Added","Expiration"];
       const rows = inventory.map(i => [i.name||'', i.description||'', i.link||'', String(i.qty||0), i.dateAdded||'', i.expiration||'']);
@@ -554,19 +635,28 @@
       const url = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
       const a = document.createElement('a'); a.href=url; a.download='inventory.csv'; a.click(); URL.revokeObjectURL(url);
     };
+    el('dlInvPdf').onclick = () => { const doc = docForInventory(inventory); pdfMake.createPdf(doc).open(); };
 
-    // ---- UPDATED: Client-side PDF for Inventory ----
-    el('dlInvPdf').onclick = async () => {
-      const doc = docForInventory(inventory);
-      // open in new tab (or use .download('inventory.pdf') to force download)
-      pdfMake.createPdf(doc).open();
-    };
+    /* ---------------------- TABS ---------------------- */
+    const tabs = document.querySelectorAll('[data-tab]');
+    const sections = { chat: el('chat'), experiments: el('experiments'), inventory: el('inventory') };
+    tabs.forEach(b=>{
+      b.onclick = () => {
+        tabs.forEach(x=>x.classList.remove('tab-active'));
+        b.classList.add('tab-active');
+        Object.values(sections).forEach(s=>s.classList.add('hidden'));
+        sections[b.dataset.tab].classList.remove('hidden');
+        if (b.dataset.tab==='experiments') loadExperiments();
+        if (b.dataset.tab==='inventory') loadInventory();
+      };
+    });
 
-    // ================== Init ==================
+    /* ---------------------- INIT --------------------- */
     (async function init(){
-      renderMsgs();
-      try { await loadInventory(); } catch { /* ignore */ }
-      try { await loadExperiments(); } catch { /* ignore */ }
+      renderGreeting();
+      renderSummary();
+      try { await loadInventory(); } catch {}
+      try { await loadExperiments(); } catch {}
     })();
   </script>
 </body>
