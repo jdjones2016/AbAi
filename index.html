@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <title>AbAI — Antibody Shopping & Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .badge{ @apply inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700; }
+      .btn{ @apply inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium border border-gray-300 shadow-sm hover:shadow transition; }
+      .btn-primary{ @apply bg-black text-white border-black; }
+      .card{ @apply rounded-2xl shadow p-4 border border-gray-200 bg-white; }
+      .input{ @apply w-full rounded-xl border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/30; }
+      .select{ @apply rounded-xl border border-gray-300 px-3 py-2 bg-white; }
+    </style>
+  </head>
+  <body class="bg-white text-gray-900">
+    <main class="max-w-6xl mx-auto px-4 py-10 space-y-8">
+      <header class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 class="text-3xl font-bold">AbAI — Antibody Shopping & Planner</h1>
+          <p class="text-gray-600">Cloudflare Pages + Functions. No local run required.</p>
+        </div>
+        <a href="https://dash.cloudflare.com/?to=/:account/pages" target="_blank" class="btn">Deploy on Cloudflare Pages</a>
+      </header>
+
+      <section class="grid md:grid-cols-4 gap-6">
+        <div class="md:col-span-1 card space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Query</label>
+            <input id="q" placeholder="Target / name / clone" class="input" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Applications</label>
+            <div id="apps" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Species Reactivity</label>
+            <div id="species" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Sort</label>
+            <select id="sort" class="select">
+              <option value="score">Best Match</option>
+              <option value="price">Lowest Price</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="md:col-span-3 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold">Results <span id="count" class="text-gray-500">(0)</span></h2>
+            <button class="btn" id="clear">Clear</button>
+          </div>
+          <div id="results" class="grid gap-4"></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="font-semibold">Shortlist</h2>
+            <p class="text-gray-600 text-sm">Antibodies you're considering.</p>
+          </div>
+          <button class="btn" id="clear-cart" style="display:none">Clear shortlist</button>
+        </div>
+        <div id="cart" class="mt-3 grid gap-3 text-sm text-gray-600">Nothing yet.</div>
+        <div id="plan" class="mt-4 border-t pt-4 text-sm" style="display:none"></div>
+      </section>
+
+      <footer class="text-center text-xs text-gray-500 py-6">
+        © <span id="year"></span> AbAI MVP. For demo use only.
+      </footer>
+    </main>
+
+    <script>
+      const appList = ['WB','ICC','IHC','Flow','IP'];
+      const speciesList = ['Human','Mouse','Rat'];
+      const selected = { apps: new Set(), species: new Set() };
+      const cart = [];
+
+      function badge(container, label, set) {
+        const btn = document.createElement('button');
+        btn.className = 'badge';
+        btn.textContent = label;
+        btn.onclick = () => {
+          if (set.has(label)) set.delete(label); else set.add(label);
+          btn.classList.toggle('bg-black');
+          btn.classList.toggle('text-white');
+          fetchResults();
+        };
+        container.appendChild(btn);
+      }
+
+      document.getElementById('apps').innerHTML = '';
+      document.getElementById('species').innerHTML = '';
+      appList.forEach(a => badge(document.getElementById('apps'), a, selected.apps));
+      speciesList.forEach(s => badge(document.getElementById('species'), s, selected.species));
+
+      document.getElementById('q').addEventListener('input', debounce(fetchResults, 250));
+      document.getElementById('sort').addEventListener('change', fetchResults);
+      document.getElementById('clear').addEventListener('click', () => {
+        document.getElementById('q').value='';
+        selected.apps.clear(); selected.species.clear();
+        document.querySelectorAll('.badge').forEach(el=>el.classList.remove('bg-black','text-white'));
+        fetchResults();
+      });
+      document.getElementById('clear-cart').addEventListener('click', () => {
+        cart.length = 0; renderCart();
+      });
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      function debounce(fn, ms) {
+        let t; return (...args) => { clearTimeout(t); t = setTimeout(()=>fn(...args), ms); };
+      }
+
+      async function fetchResults() {
+        const q = document.getElementById('q').value.trim();
+        const apps = Array.from(selected.apps).join(',');
+        const species = Array.from(selected.species).join(',');
+        const sort = document.getElementById('sort').value;
+
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (apps) params.set('apps', apps);
+        if (species) params.set('species', species);
+        params.set('sort', sort);
+        const res = await fetch('/api/antibodies?' + params.toString(), { cache: 'no-store' });
+        const json = await res.json();
+        renderResults(json.items || []);
+      }
+
+      function renderResults(items) {
+        document.getElementById('count').textContent = `(${items.length})`;
+        const root = document.getElementById('results');
+        root.innerHTML = '';
+        if (!items.length) {
+          root.innerHTML = '<div class="card text-center text-gray-600">No results. Try broadening your filters.</div>';
+          return;
+        }
+        items.forEach(a => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h3 class="text-lg font-semibold">${a.name}</h3>
+                <p class="text-sm text-gray-600">${a.vendor} • ${a.catalogNumber} • ${a.host} ${a.isotype ? '• '+a.isotype : ''}</p>
+                <p class="mt-1 text-sm"><span class="badge mr-2">${a.target}</span> ${a.reactivity.join(' / ')}</p>
+                <p class="text-sm text-gray-600 mt-1">Apps: ${a.applicationValidated.join(', ')}</p>
+                ${a.validation?.citationCount ? `<p class="text-xs text-gray-500 mt-1">Citations: ${a.validation.citationCount}${a.validation?.knockoutValidated ? ' • KO-validated' : ''}</p>` : ''}
+                ${a.notes ? `<p class="text-xs text-gray-500 mt-1">Notes: ${a.notes}</p>` : ''}
+                <div class="mt-2 text-sm">
+                  <a class="underline" href="${a.datasheetUrl}" target="_blank">Datasheet</a>
+                  ${a.rrid ? `<span class="ml-2 text-gray-500">RRID: ${a.rrid}</span>` : ''}
+                </div>
+              </div>
+              <div class="text-right min-w-[160px]">
+                <div class="text-xl font-bold">$${a.priceUSD}</div>
+                <div class="text-sm text-gray-500">${a.size}</div>
+                <button class="btn btn-primary mt-2" data-id="${a.id}">Add</button>
+              </div>
+            </div>
+          `;
+          div.querySelector('button').onclick = () => {
+            if (!cart.find(x=>x.id===a.id)) cart.push(a);
+            renderCart();
+          };
+          root.appendChild(div);
+        });
+      }
+
+      function renderCart() {
+        const root = document.getElementById('cart');
+        const clearBtn = document.getElementById('clear-cart');
+        root.innerHTML = '';
+        if (!cart.length) {
+          root.textContent = 'Nothing yet.';
+          clearBtn.style.display = 'none';
+          document.getElementById('plan').style.display = 'none';
+          return;
+        }
+        clearBtn.style.display = 'inline-flex';
+        cart.forEach(c => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between border rounded-xl p-3';
+          row.innerHTML = `
+            <div>
+              <div class="font-medium">${c.name}</div>
+              <div class="text-sm text-gray-600">${c.vendor} • ${c.catalogNumber}</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="font-semibold">$${c.priceUSD}</div>
+              <button class="btn">Remove</button>
+            </div>
+          `;
+          row.querySelector('button').onclick = () => {
+            const idx = cart.findIndex(x=>x.id===c.id);
+            if (idx>=0) cart.splice(idx,1);
+            renderCart();
+          };
+          root.appendChild(row);
+        });
+
+        // simple plan
+        const planEl = document.getElementById('plan');
+        const hosts = [...new Set(cart.map(c=>c.host))];
+        const primaries = cart.filter(c => !c.conjugate || c.conjugate === 'Unconjugated');
+        const needsSecondary = primaries.length > 0;
+        const secondaryHint = needsSecondary ? `Add a secondary anti-${hosts.join('/')} IgG matching isotype for your detection system.` : 'Primaries are conjugated; no secondary needed.';
+        const appsCovered = [...new Set(cart.flatMap(c=>c.applicationValidated))].join(', ') || '—';
+
+        planEl.innerHTML = `
+          <div><span class="font-medium">Plan summary:</span> ${cart.length} antibodies selected across ${[...new Set(cart.map(c=>c.target))].length} targets.</div>
+          <div class="mt-1"><span class="font-medium">Apps covered:</span> ${appsCovered}</div>
+          <div class="mt-1"><span class="font-medium">Secondary hint:</span> ${secondaryHint}</div>
+        `;
+        planEl.style.display = 'block';
+      }
+
+      fetchResults();
+    </script>
+  </body>
+</html>

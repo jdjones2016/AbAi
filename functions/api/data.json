@@ -1,0 +1,134 @@
+{
+  "antibodies": [
+    {
+      "id": "ab_foxo1_1",
+      "name": "FOXO1 Antibody (2H8)",
+      "target": "FOXO1",
+      "clone": "2H8",
+      "vendor": "CellBioCo",
+      "catalogNumber": "CBC-FOXO1-2H8",
+      "host": "Mouse",
+      "isMonoclonal": true,
+      "applicationValidated": [
+        "WB",
+        "ICC",
+        "IHC"
+      ],
+      "reactivity": [
+        "Human",
+        "Mouse"
+      ],
+      "conjugate": "Unconjugated",
+      "form": "Liquid",
+      "size": "100 \u00b5L",
+      "priceUSD": 329,
+      "datasheetUrl": "https://example.com/datasheet/foxo1-2h8",
+      "rrid": "AB_1234567",
+      "isotype": "IgG1",
+      "epitope": "aa150-230",
+      "validation": {
+        "western": true,
+        "icc": true,
+        "ihc": true,
+        "knockoutValidated": true,
+        "citationCount": 42
+      },
+      "notes": "Good signal/noise in WB at 1:1000; KO-validated."
+    },
+    {
+      "id": "ab_foxo1_2",
+      "name": "FOXO1 Polyclonal",
+      "target": "FOXO1",
+      "vendor": "BioAntibodies",
+      "catalogNumber": "BA-FOXO1-POLY",
+      "host": "Rabbit",
+      "isMonoclonal": false,
+      "applicationValidated": [
+        "WB",
+        "IP"
+      ],
+      "reactivity": [
+        "Human"
+      ],
+      "conjugate": "Unconjugated",
+      "form": "Lyophilized",
+      "size": "50 \u00b5g",
+      "priceUSD": 289,
+      "datasheetUrl": "https://example.com/datasheet/foxo1-poly",
+      "rrid": "AB_9876543",
+      "isotype": "IgG",
+      "validation": {
+        "western": true,
+        "ip": true,
+        "citationCount": 18
+      },
+      "notes": "Broad epitope coverage (polyclonal)."
+    },
+    {
+      "id": "ab_mapk1_1",
+      "name": "ERK2 / MAPK1 (D13.14.4E) XP\u00ae Rabbit mAb",
+      "target": "MAPK1",
+      "clone": "D13.14.4E",
+      "vendor": "CellSignal",
+      "catalogNumber": "9108",
+      "host": "Rabbit",
+      "isMonoclonal": true,
+      "applicationValidated": [
+        "WB",
+        "IHC",
+        "ICC",
+        "Flow"
+      ],
+      "reactivity": [
+        "Human",
+        "Mouse",
+        "Rat"
+      ],
+      "conjugate": "Unconjugated",
+      "form": "Liquid",
+      "size": "100 \u00b5L",
+      "priceUSD": 419,
+      "datasheetUrl": "https://example.com/datasheet/mapk1-xp",
+      "rrid": "AB_1234568",
+      "isotype": "IgG",
+      "validation": {
+        "western": true,
+        "icc": true,
+        "ihc": true,
+        "flow": true,
+        "citationCount": 320
+      },
+      "notes": "High literature support; robust across apps."
+    },
+    {
+      "id": "ab_gapdh_hrp",
+      "name": "GAPDH (HRP-conjugated) mAb",
+      "target": "GAPDH",
+      "clone": "6C5",
+      "vendor": "HouseLab",
+      "catalogNumber": "HL-GAPDH-HRP",
+      "host": "Mouse",
+      "isMonoclonal": true,
+      "applicationValidated": [
+        "WB"
+      ],
+      "reactivity": [
+        "Human",
+        "Mouse",
+        "Rat"
+      ],
+      "conjugate": "HRP",
+      "form": "Liquid",
+      "size": "100 \u00b5L",
+      "priceUSD": 199,
+      "datasheetUrl": "https://example.com/datasheet/gapdh-hrp",
+      "rrid": "AB_10617314",
+      "isotype": "IgG1",
+      "validation": {
+        "western": true,
+        "citationCount": 500
+      },
+      "notes": "Convenient loading control with HRP."
+    }
+  ]
+}
